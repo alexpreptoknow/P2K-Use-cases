@@ -1,0 +1,40 @@
+{
+  "signals": [
+    {
+      "type": "multi_cloud",
+      "label": "Tri-Cloud Azure, GCP, AWS",
+      "detail": "Azure hosts production workloads (photontrack.photon.com at 52.140.100.157, photonu.photon.com at 52.172.203.24, pulsesearch.photon.com at 104.211.74.213); GCP hosts developer tooling at 35.241.207.140 (argocd.photon.com, backstage.photon.com); AWS hosts a dev environment at 54.147.176.102 (photon-dev.photon.com).",
+      "emailAngle": "With cardholder data potentially flowing across Azure, GCP, and AWS simultaneously, photon.com's PCI DSS scope is almost certainly fragmented — we help engineering teams at companies like yours draw a single, auditable compliance boundary across all three clouds."
+    },
+    {
+      "type": "devops_maturity",
+      "label": "Exposed ArgoCD and Backstage Portals",
+      "detail": "argocd.photon.com and backstage.photon.com (plus backend-backstage.photon.com) all resolve publicly to GCP IP 35.241.207.140, meaning the GitOps deployment pipeline and internal developer portal are internet-accessible with no CDN or WAF layer observed.",
+      "emailAngle": "argocd.photon.com and backstage.photon.com are publicly resolvable on GCP — a PCI DSS auditor will flag these as unapproved external-facing system components unless network-level access controls and audit logging are explicitly documented in your CDE boundary."
+    },
+    {
+      "type": "devops_maturity",
+      "label": "Drupal 8 End-of-Life CMS",
+      "detail": "HTTP response headers reveal x-generator: Drupal 8 and x-drupal-cache: HIT, indicating the public-facing website runs Drupal 8, which reached end-of-life in November 2021 and no longer receives security patches.",
+      "emailAngle": "Your public website is serving Drupal 8 headers (EOL since Nov 2021) — under PCI DSS Requirement 6.3.3, all software must be protected from known vulnerabilities, and an unpatched CMS in scope is a finding that QSAs will not overlook."
+    },
+    {
+      "type": "security_tooling",
+      "label": "Okta SSO via AWS Global Accelerator",
+      "detail": "sso.photon.com CNAMEs to photon.customdomains.okta.com, which routes through aa4314b2f84572f89.awsglobalaccelerator.com, indicating Okta is used for SSO and is accelerated via AWS infrastructure — adding AWS to the identity plane even if not used for compute.",
+      "emailAngle": "photon.com's Okta SSO (sso.photon.com) routes through AWS Global Accelerator, meaning your identity and access management plane spans a fourth provider — under PCI DSS Requirement 8, every authentication path into the CDE must be inventoried and controlled, including third-party IdP routing."
+    },
+    {
+      "type": "payment_infra",
+      "label": "Oracle Cloud in SPF / Email Scope",
+      "detail": "The SPF record includes spf_c.oraclecloud.com alongside Salesforce (_spf.salesforce.com) and HubSpot (520036.spf08.hubspotemail.net), indicating Oracle Cloud is used for transactional or operational email — a potential additional cloud provider in compliance scope.",
+      "emailAngle": "photon.com's SPF record references Oracle Cloud, Salesforce, and HubSpot as authorised email senders — if any of these channels carry order confirmations or payment-related communications, they fall under PCI DSS Requirement 4 for data-in-transit protection and need to be scoped accordingly."
+    }
+  ],
+  "headline": "photon.com runs a confirmed tri-cloud environment (Azure, GCP, AWS) with publicly exposed ArgoCD and Backstage developer portals on GCP IP 35.241.207.140 — a critical PCI DSS scope and access-control risk.",
+  "tokensUsed": 7502,
+  "inputTokens": 6324,
+  "outputTokens": 1178,
+  "hostingSummary": "photon.com primarily hosts on Azure (multiple subdomains including photontrack, photonu, pulsesearch, wsf-training), with GCP hosting developer tooling (argocd.photon.com, backstage.photon.com) and AWS serving a dev environment (photon-dev.photon.com), all fronted by Incapsula CDN on the main domain.",
+  "totalCostToAIProvider": "$0.03664"
+}
