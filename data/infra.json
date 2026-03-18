@@ -1,0 +1,67 @@
+{
+  "score": 24,
+  "domain": "k2partnering.com",
+  "verdict": "GCP",
+  "evidence": [
+    "IP 35.214.78.165 (GCP) via k2partnering.com",
+    "IP 35.214.78.165 (GCP) via managedsolutions.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via www.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via talent.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via www.talent.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via careers.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via www.careers.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via k2university.k2partnering.com"
+  ],
+  "reasoning": "Score 24 — multiple independent signals confirm GCP",
+  "checked_at": "2026-03-18T16:22:06.634Z",
+  "confidence": "high",
+  "all_signals": [
+    { "score": 3, "signal": "IP 35.214.78.165 (GCP) via k2partnering.com", "source": "DNS A record", "provider": "GCP" },
+    { "score": 3, "signal": "IP 35.214.78.165 (GCP) via managedsolutions.k2partnering.com", "source": "DNS A record", "provider": "GCP" },
+    { "score": 3, "signal": "IP 35.214.78.165 (GCP) via www.k2partnering.com", "source": "DNS A record", "provider": "GCP" },
+    { "score": 3, "signal": "IP 35.214.78.165 (GCP) via talent.k2partnering.com", "source": "DNS A record", "provider": "GCP" },
+    { "score": 3, "signal": "IP 35.214.78.165 (GCP) via www.talent.k2partnering.com", "source": "DNS A record", "provider": "GCP" },
+    { "score": 3, "signal": "IP 35.214.78.165 (GCP) via careers.k2partnering.com", "source": "DNS A record", "provider": "GCP" },
+    { "score": 3, "signal": "IP 35.214.78.165 (GCP) via www.careers.k2partnering.com", "source": "DNS A record", "provider": "GCP" },
+    { "score": 3, "signal": "IP 35.214.78.165 (GCP) via k2university.k2partnering.com", "source": "DNS A record", "provider": "GCP" },
+    { "score": 3, "signal": "CNAME image.mail.k2partnering.com → d33rfzh3b1oeyz.cloudfront.net", "source": "CNAME", "provider": "AWS" },
+    { "score": 3, "signal": "IP 108.139.29.36 (AS16509 Amazon.com, Inc.) via image.mail.k2partnering.com", "source": "DNS A record", "provider": "AWS" },
+    { "score": 3, "signal": "IP 108.139.29.24 (AS16509 Amazon.com, Inc.) via image.mail.k2partnering.com", "source": "DNS A record", "provider": "AWS" }
+  ],
+  "cdn_fronted": false,
+  "ip_coverage": "3/13 IPs identified (1 local, 8 API)",
+  "cdn_provider": null,
+  "tech_stack_hints": {
+    "cf-ray": "9de592e8b0a54205-EWR",
+    "server": "cloudflare",
+    "self_hosted_org": "AS14340 Salesforce.com, Inc.",
+    "x-frame-options": "SAMEORIGIN",
+    "content-security-policy": "frame-ancestors 'self';, frame-ancestors 'self';"
+  },
+  "subdomains_checked": [
+    { "ips": [{ "ip": "35.214.78.165", "org": "GCP", "source": "local", "country": null, "provider": "GCP" }], "cnames": [], "subdomain": "k2partnering.com" },
+    { "ips": [{ "ip": "35.214.78.165", "org": "GCP", "source": "local", "country": null, "provider": "GCP" }], "cnames": [], "subdomain": "managedsolutions.k2partnering.com" },
+    { "ips": [{ "ip": "35.214.78.165", "org": "GCP", "source": "local", "country": null, "provider": "GCP" }], "cnames": ["k2partnering.com"], "subdomain": "www.k2partnering.com" },
+    { "ips": [{ "ip": "35.214.78.165", "org": "GCP", "source": "local", "country": null, "provider": "GCP" }], "cnames": [], "subdomain": "talent.k2partnering.com" },
+    { "ips": [{ "ip": "35.214.78.165", "org": "GCP", "source": "local", "country": null, "provider": "GCP" }], "cnames": [], "subdomain": "www.talent.k2partnering.com" },
+    { "ips": [{ "ip": "35.214.78.165", "org": "GCP", "source": "local", "country": null, "provider": "GCP" }], "cnames": [], "subdomain": "careers.k2partnering.com" },
+    { "ips": [{ "ip": "35.214.78.165", "org": "GCP", "source": "local", "country": null, "provider": "GCP" }], "cnames": [], "subdomain": "www.careers.k2partnering.com" },
+    { "ips": [{ "ip": "35.214.78.165", "org": "GCP", "source": "local", "country": null, "provider": "GCP" }], "cnames": [], "subdomain": "k2university.k2partnering.com" },
+    { "ips": [{ "ip": "108.139.29.36", "org": "AS16509 Amazon.com, Inc.", "source": "api", "country": "US", "provider": "AWS" }, { "ip": "108.139.29.24", "org": "AS16509 Amazon.com, Inc.", "source": "api", "country": "US", "provider": "AWS" }, { "ip": "108.139.29.10", "org": "unknown", "source": "api", "country": null, "provider": "Unknown" }, { "ip": "108.139.29.126", "org": "unknown", "source": "api", "country": null, "provider": "Unknown" }], "cnames": ["tll7thrwf02scstq98npv1082dh0.image-sap.sfmc-content.com", "d33rfzh3b1oeyz.cloudfront.net"], "subdomain": "image.mail.k2partnering.com" },
+    { "ips": [{ "ip": "13.111.210.4", "org": "AS14340 Salesforce.com, Inc.", "source": "api", "country": "US", "provider": "Unknown" }], "cnames": [], "subdomain": "click.mail.k2partnering.com" },
+    { "ips": [{ "ip": "13.111.212.11", "org": "AS14340 Salesforce.com, Inc.", "source": "api", "country": "US", "provider": "Unknown" }], "cnames": [], "subdomain": "view.mail.k2partnering.com" },
+    { "ips": [{ "ip": "13.111.208.232", "org": "unknown", "source": "api", "country": null, "provider": "Unknown" }], "cnames": [], "subdomain": "cloud.mail.k2partnering.com" },
+    { "ips": [{ "ip": "95.138.136.210", "org": "unknown", "source": "api", "country": null, "provider": "Unknown" }], "cnames": [], "subdomain": "k2remote.k2partnering.com" },
+    { "ips": [{ "ip": "185.54.65.102", "org": "unknown", "source": "skipped", "country": null, "provider": "Unknown" }], "cnames": [], "subdomain": "drive.k2partnering.com" },
+    { "ips": [{ "ip": "193.130.74.203", "org": "unknown", "source": "skipped", "country": null, "provider": "Unknown" }], "cnames": [], "subdomain": "euremote.k2partnering.com" },
+    { "ips": [{ "ip": "95.138.136.210", "org": "unknown", "source": "api", "country": null, "provider": "Unknown" }], "cnames": [], "subdomain": "jobs.k2partnering.com" },
+    { "ips": [{ "ip": "68.232.201.28", "org": "unknown", "source": "skipped", "country": null, "provider": "Unknown" }], "cnames": [], "subdomain": "mail.k2partnering.com" },
+    { "ips": [{ "ip": "13.111.51.175", "org": "unknown", "source": "skipped", "country": null, "provider": "Unknown" }], "cnames": [], "subdomain": "mta.mail.k2partnering.com" },
+    { "ips": [{ "ip": "95.138.136.210", "org": "unknown", "source": "api", "country": null, "provider": "Unknown" }], "cnames": [], "subdomain": "www2.k2partnering.com" }
+  ],
+  "email_infrastructure": {
+    "mx_records": ["mx-02-us-east-2.prod.hydra.sophos.com.", "mx-01-us-east-2.prod.hydra.sophos.com."],
+    "spf_record": "v=spf1 include:_spf_useast2.prod.hydra.sophos.com ip4:165.76.145.65 include:_spf.google.com include:smp.ne.jp mx include:_spf.salesforce.com -all",
+    "email_provider": "Unknown"
+  }
+}
