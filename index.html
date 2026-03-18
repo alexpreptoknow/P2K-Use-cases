@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Infra Analysis - k2partnering.com</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #38bdf8;
+    }
+    .card {
+      background: #1e293b;
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+    .tag {
+      display: inline-block;
+      background: #334155;
+      padding: 4px 8px;
+      border-radius: 6px;
+      margin-right: 6px;
+      font-size: 12px;
+    }
+    pre {
+      background: #020617;
+      padding: 12px;
+      overflow-x: auto;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    details {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔍 k2partnering.com</h1>
+<p>Multi-cloud infrastructure detected with GCP, AWS, and Salesforce dependencies.</p>
+
+<div class="card">
+  <h2>Key Findings</h2>
+
+  <div class="card">
+    <strong>Multi-cloud setup</strong><br/>
+    GCP (core) + AWS (email delivery)
+  </div>
+
+  <div class="card">
+    <strong>Email stack</strong><br/>
+    Salesforce Marketing Cloud + Sophos
+  </div>
+
+  <div class="card">
+    <strong>Potential gap</strong><br/>
+    Inconsistent Cloudflare coverage across subdomains
+  </div>
+</div>
+
+<div class="card">
+  <h2>AI Analysis</h2>
+
+  <div id="ai-signals"></div>
+
+  <details>
+    <summary>Show raw AI JSON</summary>
+    <pre id="ai-json"></pre>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Infrastructure Data</h2>
+
+  <details open>
+    <summary>Show raw infra JSON</summary>
+    <pre id="infra-json"></pre>
+  </details>
+</div>
+
+<script>
+  const infraData = {
+  "score": 24,
+  "domain": "k2partnering.com",
+  "verdict": "GCP",
+  "evidence": [
+    "IP 35.214.78.165 (GCP) via k2partnering.com",
+    "IP 35.214.78.165 (GCP) via managedsolutions.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via www.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via talent.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via www.talent.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via careers.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via www.careers.k2partnering.com",
+    "IP 35.214.78.165 (GCP) via k2university.k2partnering.com"
+  ],
+  "reasoning": "Score 24 — multiple independent signals confirm GCP",
+  "checked_at": "2026-03-18T16:22:06.634Z",
+  "confidence": "high",
+  "all_signals": [
+    {
+      "score": 3,
+      "signal": "IP 35.214.78.165 (GCP) via k2partnering.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.214.78.165 (GCP) via managedsolutions.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.214.78.165 (GCP) via www.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.214.78.165 (GCP) via talent.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.214.78.165 (GCP) via www.talent.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.214.78.165 (GCP) via careers.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.214.78.165 (GCP) via www.careers.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.214.78.165 (GCP) via k2university.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "CNAME image.mail.k2partnering.com → d33rfzh3b1oeyz.cloudfront.net",
+      "source": "CNAME",
+      "provider": "AWS"
+    },
+    {
+      "score": 3,
+      "signal": "IP 108.139.29.36 (AS16509 Amazon.com, Inc.) via image.mail.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "AWS"
+    },
+    {
+      "score": 3,
+      "signal": "IP 108.139.29.24 (AS16509 Amazon.com, Inc.) via image.mail.k2partnering.com",
+      "source": "DNS A record",
+      "provider": "AWS"
+    }
+  ],
+  "cdn_fronted": false,
+  "ip_coverage": "3/13 IPs identified (1 local, 8 API)",
+  "cdn_provider": null,
+  "tech_stack_hints": {
+    "cf-ray": "9de592e8b0a54205-EWR",
+    "server": "cloudflare",
+    "self_hosted_org": "AS14340 Salesforce.com, Inc.",
+    "x-frame-options": "SAMEORIGIN",
+    "content-security-policy": "frame-ancestors 'self';, frame-ancestors 'self';"
+  },
+  "subdomains_checked": [
+    {
+      "ips": [
+        {
+          "ip": "35.214.78.165",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.214.78.165",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "managedsolutions.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.214.78.165",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [
+        "k2partnering.com"
+      ],
+      "subdomain": "www.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.214.78.165",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "talent.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.214.78.165",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "www.talent.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.214.78.165",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "careers.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.214.78.165",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "www.careers.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.214.78.165",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "k2university.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "108.139.29.36",
+          "org": "AS16509 Amazon.com, Inc.",
+          "source": "api",
+          "country": "US",
+          "provider": "AWS"
+        },
+        {
+          "ip": "108.139.29.24",
+          "org": "AS16509 Amazon.com, Inc.",
+          "source": "api",
+          "country": "US",
+          "provider": "AWS"
+        },
+        {
+          "ip": "108.139.29.10",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        },
+        {
+          "ip": "108.139.29.126",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [
+        "tll7thrwf02scstq98npv1082dh0.image-sap.sfmc-content.com",
+        "d33rfzh3b1oeyz.cloudfront.net"
+      ],
+      "subdomain": "image.mail.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "13.111.210.4",
+          "org": "AS14340 Salesforce.com, Inc.",
+          "source": "api",
+          "country": "US",
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "click.mail.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "13.111.212.11",
+          "org": "AS14340 Salesforce.com, Inc.",
+          "source": "api",
+          "country": "US",
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "view.mail.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "13.111.208.232",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "cloud.mail.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "95.138.136.210",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "k2remote.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "185.54.65.102",
+          "org": "unknown",
+          "source": "skipped",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "drive.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "193.130.74.203",
+          "org": "unknown",
+          "source": "skipped",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "euremote.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "95.138.136.210",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "jobs.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "68.232.201.28",
+          "org": "unknown",
+          "source": "skipped",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "mail.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "13.111.51.175",
+          "org": "unknown",
+          "source": "skipped",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "mta.mail.k2partnering.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "95.138.136.210",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "www2.k2partnering.com"
+    }
+  ],
+  "email_infrastructure": {
+    "mx_records": [
+      "mx-02-us-east-2.prod.hydra.sophos.com.",
+      "mx-01-us-east-2.prod.hydra.sophos.com."
+    ],
+    "spf_record": "v=spf1 include:_spf_useast2.prod.hydra.sophos.com ip4:165.76.145.65 include:_spf.google.com include:smp.ne.jp mx include:_spf.salesforce.com -all",
+    "email_provider": "Unknown"
+  }
+};
+  const aiData = {
+  "signals": [
+    {
+      "type": "multi_cloud",
+      "label": "GCP + AWS Split Environment",
+      "detail": "Primary domain and 7 subdomains (including managedsolutions, talent, careers, k2university) all resolve to GCP IP 35.214.78.165, while image.mail.k2partnering.com CNAMEs to AWS CloudFront (d33rfzh3b1oeyz.cloudfront.net) with IPs in AS16509 Amazon.com range.",
+      "emailAngle": "With your core platform on GCP and email delivery routing through AWS CloudFront, your PCI DSS cardholder data environment scope likely spans two cloud providers — we help staffing firms like K2 Partnering map and evidence that boundary for QSA audits."
+    },
+    {
+      "type": "security_tooling",
+      "label": "Sophos Email Gateway Active",
+      "detail": "MX records point exclusively to mx-01-us-east-2.prod.hydra.sophos.com and mx-02-us-east-2.prod.hydra.sophos.com, confirming Sophos Hydra (Email Security) is deployed for inbound mail filtering.",
+      "emailAngle": "You're running Sophos Hydra for email security, which is a strong control, but PCI DSS v4.0 Requirement 5.4 demands documented anti-phishing coverage across all channels — we can help you evidence that Sophos deployment satisfies scope for your next assessment."
+    },
+    {
+      "type": "payment_infra",
+      "label": "Salesforce Marketing Cloud in SPF Scope",
+      "detail": "SPF record includes _spf.salesforce.com and the CNAME chain for image.mail.k2partnering.com passes through tll7thrwf02scstq98npv1082dh0.image-sap.sfmc-content.com, confirming Salesforce Marketing Cloud is used for transactional/marketing email.",
+      "emailAngle": "Salesforce Marketing Cloud is explicitly in your SPF scope and handling email delivery — if any of those campaigns touch payment confirmations or candidate financial data, that brings SFMC into your PCI DSS cardholder data environment, which is a common audit gap we can help you close."
+    },
+    {
+      "type": "geography",
+      "label": "EU Remote Subdomain Exposed",
+      "detail": "euremote.k2partnering.com resolves to 193.130.74.203 (unknown org, non-cloud IP), and k2remote.k2partnering.com resolves to 95.138.136.210 — both appear to be self-hosted or third-party remote access endpoints outside the primary GCP environment.",
+      "emailAngle": "euremote.k2partnering.com and k2remote.k2partnering.com are resolving to unidentified IPs outside your GCP estate — remote access endpoints are a direct PCI DSS Requirement 8.6 finding if they lack MFA documentation, and we can help you assess whether they fall inside your compliance boundary."
+    },
+    {
+      "type": "devops_maturity",
+      "label": "Cloudflare WAF on GCP Origin",
+      "detail": "Response headers show server: cloudflare with cf-ray: 9de592e8b0a54205-EWR, meaning Cloudflare is fronting the GCP origin (35.214.78.165), but cdn_fronted is flagged false — suggesting partial or inconsistent Cloudflare coverage across subdomains.",
+      "emailAngle": "Cloudflare is active on your primary domain but our scan shows inconsistent coverage across subdomains like k2university.k2partnering.com and managedsolutions.k2partnering.com — uneven WAF coverage is a PCI DSS Requirement 6.4 gap that auditors routinely flag, and we can help you document the full perimeter."
+    }
+  ],
+  "headline": "k2partnering.com runs a GCP-primary multi-cloud environment with AWS CloudFront for email delivery and Salesforce Marketing Cloud for campaigns, creating a distributed PCI DSS compliance scope across at least three providers.",
+  "tokensUsed": 7070,
+  "inputTokens": 5936,
+  "outputTokens": 1134,
+  "hostingSummary": "Core web infrastructure (35.214.78.165) is hosted on GCP, with AWS CloudFront (d33rfzh3b1oeyz.cloudfront.net) used for email image delivery via Salesforce Marketing Cloud, and Sophos Email Security (Hydra MX) handling inbound mail filtering.",
+  "totalCostToAIProvider": "$0.034820000000000004"
+};
+
+  // Pretty print JSON
+  document.getElementById("infra-json").textContent =
+    JSON.stringify(infraData, null, 2);
+
+  document.getElementById("ai-json").textContent =
+    JSON.stringify(aiData, null, 2);
+
+  // Render AI signals nicely
+  const container = document.getElementById("ai-signals");
+
+  aiData.signals.forEach(signal => {
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <strong>${signal.label}</strong><br/>
+      <small>${signal.type}</small><br/><br/>
+      ${signal.detail}<br/><br/>
+      <em>${signal.emailAngle}</em>
+    `;
+
+    container.appendChild(div);
+  });
+</script>
+
+</body>
+</html>
