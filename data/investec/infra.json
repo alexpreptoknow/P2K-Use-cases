@@ -1,0 +1,240 @@
+{
+  "score": 3,
+  "domain": "investec.com",
+  "verdict": "AWS",
+  "evidence": [
+    "IP 34.250.63.54 (AWS) via api.investec.com"
+  ],
+  "reasoning": "Score 3 — signals lean toward AWS. Front-end behind Cloudflare",
+  "checked_at": "2026-03-18T13:19:13.979Z",
+  "confidence": "medium",
+  "all_signals": [
+    {
+      "score": 3,
+      "signal": "IP 104.16.204.57 (Cloudflare) via investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 34.250.63.54 (AWS) via api.investec.com",
+      "source": "DNS A record",
+      "provider": "AWS"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.16.203.57 (Cloudflare) via portal.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.16.204.57 (Cloudflare) via portal.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.18.191.234 (Cloudflare) via secure.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.18.190.234 (Cloudflare) via secure.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.16.203.57 (Cloudflare) via staging.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.16.204.57 (Cloudflare) via staging.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.16.203.57 (Cloudflare) via dev.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.16.204.57 (Cloudflare) via dev.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.21.3.28 (Cloudflare) via web.investec.com",
+      "source": "DNS A record",
+      "provider": "Cloudflare"
+    }
+  ],
+  "cdn_fronted": true,
+  "ip_coverage": "6/7 IPs identified (6 local, 1 API)",
+  "cdn_provider": "Cloudflare",
+  "tech_stack_hints": {
+    "cf-ray": "9de486ee1f5c0f78-EWR",
+    "server": "cloudflare",
+    "x-frame-options": "SAMEORIGIN"
+  },
+  "subdomains_checked": [
+    {
+      "ips": [
+        {
+          "ip": "104.16.204.57",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "investec.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "34.250.63.54",
+          "org": "AWS",
+          "source": "local",
+          "country": null,
+          "provider": "AWS"
+        }
+      ],
+      "cnames": [
+        "api.investec.com.cdn.cloudflare.net",
+        "investec-prod-production.apigee.net",
+        "reu1rtd100-0-routers.dn.apigee.net"
+      ],
+      "subdomain": "api.investec.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "104.16.203.57",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        },
+        {
+          "ip": "104.16.204.57",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        }
+      ],
+      "cnames": [
+        "portal.investec.com.cdn.cloudflare.net"
+      ],
+      "subdomain": "portal.investec.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "104.18.191.234",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        },
+        {
+          "ip": "104.18.190.234",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "secure.investec.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "104.16.203.57",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        },
+        {
+          "ip": "104.16.204.57",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        }
+      ],
+      "cnames": [
+        "staging.investec.com.cdn.cloudflare.net"
+      ],
+      "subdomain": "staging.investec.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "104.16.203.57",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        },
+        {
+          "ip": "104.16.204.57",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        }
+      ],
+      "cnames": [
+        "dev.investec.com.cdn.cloudflare.net"
+      ],
+      "subdomain": "dev.investec.com"
+    },
+    {
+      "ips": [],
+      "cnames": [
+        "store.investec.com.cdn.cloudflare.net"
+      ],
+      "subdomain": "store.investec.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "172.67.130.35",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        },
+        {
+          "ip": "104.21.3.28",
+          "org": "Cloudflare",
+          "source": "local",
+          "country": null,
+          "provider": "Cloudflare"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "web.investec.com"
+    }
+  ],
+  "email_infrastructure": {
+    "mx_records": [
+      "za-smtp-inbound-1.mimecast.co.za.",
+      "za-smtp-inbound-2.mimecast.co.za."
+    ],
+    "spf_record": "v=spf1 redirect=aa6l1x4z._spf._d.mim.ec",
+    "email_provider": "Unknown"
+  }
+}
