@@ -1,1243 +1,935 @@
-// ============================================================
-// Hosting Detection Worker v9
-// POST /  { "domain": "example.com" }
-// Cloudflare Worker secrets:
-//   SECURITYTRAILS_KEY  — adds historical DNS (50 free/mo, optional)
-// ============================================================
-
-// ─── Local IP Range Tables ────────────────────────────────────
-
-function ipToInt(ip) {
-  const p = ip.split(".").map(Number);
-  return ((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0;
-}
-
-function cidrToRange(cidr) {
-  const [ip, bits] = cidr.split("/");
-  const base = ipToInt(ip);
-  const mask = bits === "0" ? 0 : (~0 << (32 - parseInt(bits))) >>> 0;
-  const start = (base & mask) >>> 0;
-  const end = (start + (~mask >>> 0)) >>> 0;
-  return [start, end];
-}
-
-function buildRangeTable(cidrs, provider) {
-  return cidrs.map(cidr => [...cidrToRange(cidr), provider]);
-}
-
-function lookupInTable(ipInt, table) {
-  for (const [start, end, provider] of table) {
-    if (ipInt >= start && ipInt <= end) return provider;
-  }
-  return null;
-}
-
-const CLOUDFLARE_RANGES = buildRangeTable([
-  "173.245.48.0/20","103.21.244.0/22","103.22.200.0/22",
-  "103.31.4.0/22","141.101.64.0/18","108.162.192.0/18",
-  "190.93.240.0/20","188.114.96.0/20","197.234.240.0/22",
-  "198.41.128.0/17","162.158.0.0/15","104.16.0.0/13",
-  "104.24.0.0/14","172.64.0.0/13","131.0.72.0/22",
-  "216.198.48.0/20","172.67.0.0/16","104.21.0.0/16",
-], "Cloudflare");
-
-const AWS_RANGES = buildRangeTable([
-  "3.80.0.0/12","3.208.0.0/12","3.224.0.0/12","3.240.0.0/12",
-  "18.64.0.0/10","18.144.0.0/15","18.208.0.0/13","18.232.0.0/14",
-  "52.0.0.0/11","52.32.0.0/11","52.64.0.0/12","52.88.0.0/13",
-  "52.192.0.0/11","52.208.0.0/13","52.210.0.0/15","52.212.0.0/14",
-  "54.144.0.0/12","54.160.0.0/11","54.192.0.0/12","54.208.0.0/13","54.224.0.0/11",
-  "13.32.0.0/15","13.35.0.0/16","13.224.0.0/14","13.226.0.0/15",
-  "52.84.0.0/15","54.230.0.0/15","54.239.128.0/18","64.252.64.0/18",
-  "99.84.0.0/16","99.86.0.0/16","130.176.0.0/16","143.204.0.0/16",
-  "205.251.192.0/19","205.251.249.0/24",
-  "15.197.0.0/16","3.33.0.0/16",
-  "34.192.0.0/12","34.208.0.0/12","34.224.0.0/12",
-  "34.240.0.0/13","34.248.0.0/13",
-], "AWS");
-
-const GCP_RANGES = buildRangeTable([
-  "34.64.0.0/10","34.128.0.0/10","34.192.0.0/12",
-  "35.184.0.0/13","35.192.0.0/11","35.224.0.0/12","35.240.0.0/13",
-  "104.154.0.0/15","104.196.0.0/14","108.59.80.0/20",
-  "146.148.0.0/17","162.216.148.0/22","162.222.176.0/21",
-  "173.255.112.0/20","192.158.28.0/22","199.192.112.0/22",
-  "199.223.232.0/21","216.239.32.0/22",
-  "34.0.0.0/15","34.2.0.0/16","34.3.0.0/23","34.4.0.0/14",
-  "34.8.0.0/13","34.16.0.0/12","34.32.0.0/11","34.80.0.0/12",
-  "34.96.0.0/11","34.118.0.0/15","34.120.0.0/13","34.152.0.0/13",
-  "34.160.0.0/12","34.176.0.0/13","35.186.0.0/15","35.188.0.0/13",
-  "35.196.0.0/14","35.200.0.0/13","35.208.0.0/12","35.220.0.0/14",
-  "35.228.0.0/13","35.236.0.0/13","35.244.0.0/14",
-  "172.217.0.0/16","172.253.0.0/16","142.250.0.0/15","142.251.0.0/16",
-  "108.177.0.0/17","209.85.128.0/17","216.58.192.0/19",
-  "66.102.0.0/20","66.249.64.0/19","74.125.0.0/16","173.194.0.0/16",
-], "GCP");
-
-const AZURE_RANGES = buildRangeTable([
-  "13.64.0.0/11","13.93.0.0/16","13.96.0.0/13","13.104.0.0/14",
-  "20.0.0.0/11","20.32.0.0/11","20.64.0.0/10","20.112.0.0/12",
-  "20.128.0.0/11","20.160.0.0/12","20.176.0.0/12","20.192.0.0/10",
-  "23.96.0.0/13","23.102.0.0/18",
-  "40.64.0.0/10","40.112.0.0/13","40.113.0.0/16","40.114.0.0/16",
-  "40.120.0.0/14","40.124.0.0/16","40.125.0.0/17",
-  "51.0.0.0/11","51.104.0.0/15","51.132.0.0/16",
-  "52.96.0.0/12","52.112.0.0/14","52.120.0.0/14","52.136.0.0/13",
-  "52.140.0.0/14","52.148.0.0/14","52.152.0.0/13","52.157.0.0/16",
-  "52.160.0.0/11","52.224.0.0/11",
-  "65.52.0.0/14","70.37.0.0/17",
-  "104.40.0.0/13","104.208.0.0/13","104.214.0.0/15",
-  "137.116.0.0/15","137.135.0.0/16","138.91.0.0/16",
-  "157.56.0.0/14","168.61.0.0/16","168.62.0.0/15","191.232.0.0/13",
-], "Azure");
-
-const AKAMAI_RANGES = buildRangeTable([
-  "2.16.0.0/13","23.0.0.0/12","23.32.0.0/11","23.64.0.0/14",
-  "23.192.0.0/11","60.254.0.0/16","63.208.0.0/13","65.124.0.0/14",
-  "65.160.0.0/11","66.171.0.0/16","72.246.0.0/15","80.67.64.0/18",
-  "82.145.192.0/18","88.221.0.0/16","92.122.0.0/15","95.100.0.0/15",
-  "96.6.0.0/15","104.64.0.0/10","110.232.176.0/20","118.214.0.0/16",
-  "184.24.0.0/13","184.50.0.0/15","184.84.0.0/14","193.108.88.0/21",
-], "Akamai");
-
-const DO_RANGES = buildRangeTable([
-  "45.55.0.0/16","104.131.0.0/18","104.236.0.0/16","107.170.0.0/16",
-  "138.197.0.0/16","138.68.0.0/15","159.65.0.0/16","159.89.0.0/16",
-  "162.243.0.0/16","165.227.0.0/16","167.99.0.0/16","174.138.0.0/16",
-  "178.128.0.0/15","188.166.0.0/15","192.241.128.0/17","198.199.64.0/18",
-  "206.189.0.0/16",
-], "DigitalOcean");
-
-const FASTLY_RANGES = buildRangeTable([
-  "23.235.32.0/20","43.249.72.0/22","103.244.50.0/24",
-  "103.245.222.0/23","103.245.224.0/24","104.156.80.0/20",
-  "140.248.64.0/18","140.248.128.0/17","146.75.0.0/16",
-  "151.101.0.0/16","157.52.64.0/18","167.82.0.0/17",
-  "167.82.128.0/20","167.82.160.0/20","167.82.224.0/20",
-  "172.111.64.0/18","185.31.16.0/22","199.27.72.0/21","199.232.0.0/16",
-], "Fastly");
-
-const INCAPSULA_RANGES = buildRangeTable([
-  "45.60.0.0/16","45.223.0.0/16","103.102.166.0/24",
-  "107.154.0.0/16","149.126.72.0/21","185.11.124.0/22",
-  "192.230.64.0/18","199.83.128.0/21",
-], "Incapsula");
-
-const HETZNER_RANGES = buildRangeTable([
-  "5.9.0.0/16","5.75.128.0/17","23.88.0.0/17","65.108.0.0/16",
-  "65.109.0.0/16","78.46.0.0/15","85.10.192.0/18","88.198.0.0/16",
-  "91.107.128.0/17","95.216.0.0/16","116.202.0.0/15","128.140.0.0/17",
-  "136.243.0.0/16","157.90.0.0/16","159.69.0.0/16","168.119.0.0/16",
-  "176.9.0.0/18","188.34.128.0/17","188.40.0.0/16","195.201.0.0/16",
-  "213.239.192.0/18",
-], "Hetzner");
-
-const OVH_RANGES = buildRangeTable([
-  "5.135.0.0/16","37.59.0.0/16","51.68.0.0/16","51.75.0.0/16",
-  "51.77.0.0/16","51.89.0.0/16","51.91.0.0/16","54.36.0.0/16",
-  "54.38.0.0/16","87.98.128.0/17","91.121.0.0/16","92.222.0.0/16",
-  "135.125.0.0/16","139.99.0.0/16","141.95.0.0/16","145.239.0.0/16",
-  "146.59.0.0/16","151.80.0.0/15","178.32.0.0/15","188.165.0.0/16",
-  "193.70.0.0/16","198.27.64.0/18","213.32.0.0/16",
-], "OVH");
-
-const ALL_RANGES = [
-  ...CLOUDFLARE_RANGES, ...AWS_RANGES, ...GCP_RANGES, ...AZURE_RANGES,
-  ...AKAMAI_RANGES, ...DO_RANGES, ...FASTLY_RANGES, ...INCAPSULA_RANGES,
-  ...HETZNER_RANGES, ...OVH_RANGES,
-];
-
-function classifyIPLocal(ip) {
-  try { return lookupInTable(ipToInt(ip), ALL_RANGES); }
-  catch { return null; }
-}
-
-// ─── Provider / CNAME Maps ────────────────────────────────────
-
-const ASN_MAP = {
-  "AMAZON": "AWS","AWS": "AWS","AMAZON-02": "AWS",
-  "GOOGLE": "GCP","GOOGLE-CLOUD": "GCP",
-  "MICROSOFT": "Azure","MICROSOFT-AZURE": "Azure",
-  "CLOUDFLARENET": "Cloudflare","CLOUDFLARE": "Cloudflare",
-  "AKAMAI": "Akamai","AKAMAI-AS": "Akamai",
-  "FASTLY": "Fastly",
-  "DIGITALOCEAN": "DigitalOcean",
-  "HETZNER": "Hetzner",
-  "OVH": "OVH",
-  "LINODE": "Linode",
-  "INCAPSULA": "Incapsula","IMPERVA": "Incapsula",
-};
-
-const CDN_PROVIDERS = new Set(["Cloudflare","Akamai","Fastly","Incapsula"]);
-
-const CNAME_MAP = [
-  { s: ".amazonaws.com",          p: "AWS" },
-  { s: ".elasticbeanstalk.com",   p: "AWS" },
-  { s: ".cloudfront.net",         p: "AWS" },
-  { s: ".elb.amazonaws.com",      p: "AWS" },
-  { s: ".execute-api.",           p: "AWS" },
-  { s: ".s3.amazonaws.com",       p: "AWS" },
-  { s: ".googleapis.com",         p: "GCP" },
-  { s: ".googleusercontent.com",  p: "GCP" },
-  { s: ".googlehosted.com",       p: "GCP" },
-  { s: ".googledomains.com",      p: "GCP" },
-  { s: ".run.app",                p: "GCP" },
-  { s: ".appspot.com",            p: "GCP" },
-  { s: ".cloudfunctions.net",     p: "GCP" },
-  { s: ".apigee.net",             p: "GCP" },   // ← new: Google Apigee
-  { s: ".apigee.com",             p: "GCP" },
-  { s: ".azure.com",              p: "Azure" },
-  { s: ".azurewebsites.net",      p: "Azure" },
-  { s: ".azureedge.net",          p: "Azure" },
-  { s: ".windows.net",            p: "Azure" },
-  { s: ".trafficmanager.net",     p: "Azure" },
-  { s: ".cloudapp.net",           p: "Azure" },
-  { s: ".cloudapp.azure.com",     p: "Azure" },
-  { s: ".cloudflare.com",         p: "Cloudflare" },
-  { s: ".pages.dev",              p: "Cloudflare" },
-  { s: ".workers.dev",            p: "Cloudflare" },
-  { s: ".cdn.cloudflare.net",     p: "Cloudflare" },
-  { s: ".digitaloceanspaces.com", p: "DigitalOcean" },
-  { s: ".ondigitalocean.com",     p: "DigitalOcean" },
-  { s: ".heroku.com",             p: "Heroku" },
-  { s: ".herokudns.com",          p: "Heroku" },
-  { s: ".herokuspace.com",        p: "Heroku" },
-  { s: ".herokuapp.com",          p: "Heroku" },
-  { s: ".fastly.net",             p: "Fastly" },
-  { s: ".netlify.app",            p: "Netlify" },
-  { s: ".vercel.app",             p: "Vercel" },
-  { s: ".pantheonsite.io",        p: "Pantheon" },
-  { s: ".wpengine.com",           p: "WP Engine" },
-  { s: ".kinsta.cloud",           p: "Kinsta" },
-  { s: ".render.com",             p: "Render" },
-  { s: ".railway.app",            p: "Railway" },
-  { s: ".fly.dev",                p: "Fly.io" },
-];
-
-// Tech stack CNAMEs → surfaced in tech_stack_hints, never influence verdict
-const TECH_CNAME_MAP = [
-  { s: ".myshopify.com",          t: "Shopify" },
-  { s: ".hubspot.com",            t: "HubSpot" },
-  { s: ".hubspotemail.net",       t: "HubSpot" },
-  { s: ".hscoscdn",               t: "HubSpot" },
-  { s: ".hs-sites.com",           t: "HubSpot" },
-  { s: ".hubspot.net",            t: "HubSpot" },
-  { s: ".salesforce.com",         t: "Salesforce" },
-  { s: ".force.com",              t: "Salesforce" },
-  { s: ".exacttarget.com",        t: "Salesforce Marketing Cloud" },
-  { s: ".marketo.com",            t: "Marketo" },
-  { s: ".marketo.net",            t: "Marketo" },
-  { s: ".zendesk.com",            t: "Zendesk" },
-  { s: ".zendeskcdn.com",         t: "Zendesk" },
-  { s: ".intercom.io",            t: "Intercom" },
-  { s: ".intercom.com",           t: "Intercom" },
-  { s: ".stripe.com",             t: "Stripe" },
-  { s: ".braintreegateway.com",   t: "Braintree" },
-  { s: ".adyen.com",              t: "Adyen" },
-  { s: ".checkout.com",           t: "Checkout.com" },
-  { s: ".wordpress.com",          t: "WordPress.com" },
-  { s: ".wixsite.com",            t: "Wix" },
-  { s: ".squarespace.com",        t: "Squarespace" },
-  { s: ".ghost.io",               t: "Ghost" },
-  { s: ".webflow.io",             t: "Webflow" },
-  { s: ".webflow.com",            t: "Webflow" },
-  { s: ".groove.co",              t: "Groove HQ" },
-  { s: ".groovehq.com",           t: "Groove HQ" },
-  { s: ".sendgrid.net",           t: "SendGrid" },
-  { s: ".mailgun.org",            t: "Mailgun" },
-  { s: ".mcsv.net",               t: "Mailchimp" },
-  { s: ".mandrillapp.com",        t: "Mandrill" },
-  { s: ".segment.com",            t: "Segment" },
-  { s: ".mixpanel.com",           t: "Mixpanel" },
-  { s: ".amplitude.com",          t: "Amplitude" },
-  { s: ".datadog.com",            t: "Datadog" },
-  { s: ".datadoghq.com",          t: "Datadog" },
-  { s: ".newrelic.com",           t: "New Relic" },
-  { s: ".qualys.com",             t: "Qualys" },
-  { s: ".snyk.io",                t: "Snyk" },
-  { s: ".algolia.net",            t: "Algolia" },
-  { s: ".algolia.com",            t: "Algolia" },
-  { s: ".dscr.akamai.net",        t: "Akamai CDN" },
-  { s: ".edgesuite.net",          t: "Akamai CDN" },
-  { s: ".arc-dns.net",            t: "Arc Publishing" },
-  { s: ".gpcloudservice.com",     t: "GP Cloud" },
-  { s: ".sumtotalsystems.com",    t: "SumTotal LMS" },
-  { s: ".apigee.net",             t: "Google Apigee (API Gateway)" },
-  { s: ".zohohost.com",           t: "Zoho" },
-  { s: ".zoho.com",               t: "Zoho" },
-  { s: ".incapsula.com",          t: "Imperva/Incapsula WAF" },
-  { s: ".imperva.com",            t: "Imperva/Incapsula WAF" },
-];
-
-const HEADER_PROVIDER_MAP = [
-  { header: "server",               pattern: /awselb|amazon/i,       provider: "AWS" },
-  { header: "server",               pattern: /cloudfront/i,          provider: "AWS" },
-  { header: "server",               pattern: /gws|gse|google/i,      provider: "GCP" },
-  { header: "server",               pattern: /microsoft-iis/i,       provider: "Azure" },
-  { header: "x-powered-by",         pattern: /asp\.net/i,            provider: "Azure" },
-  { header: "x-powered-by",         pattern: /aws/i,                 provider: "AWS" },
-  { header: "x-amz-request-id",     pattern: /.*/,                   provider: "AWS" },
-  { header: "x-amz-id-2",           pattern: /.*/,                   provider: "AWS" },
-  { header: "x-amzn-requestid",     pattern: /.*/,                   provider: "AWS" },
-  { header: "x-amzn-trace-id",      pattern: /.*/,                   provider: "AWS" },
-  { header: "x-azure-ref",          pattern: /.*/,                   provider: "Azure" },
-  { header: "x-ms-request-id",      pattern: /.*/,                   provider: "Azure" },
-  { header: "x-ms-version",         pattern: /.*/,                   provider: "Azure" },
-  { header: "x-goog-generation",    pattern: /.*/,                   provider: "GCP" },
-  { header: "x-guploader-uploadid", pattern: /.*/,                   provider: "GCP" },
-  { header: "x-goog-hash",          pattern: /.*/,                   provider: "GCP" },
-  { header: "via",                   pattern: /1\.1 google/i,         provider: "GCP" },
-  { header: "via",                   pattern: /cloudfront/i,          provider: "AWS" },
-  { header: "x-cache",              pattern: /cloudfront/i,           provider: "AWS" },
-];
-
-const TECH_HEADERS = [
-  "x-powered-by","x-aspnet-version","x-generator",
-  "x-drupal-cache","x-shopify-stage","x-served-by",
-  "x-backend","x-application","server",
-  "x-frame-options","content-security-policy",
-];
-
-const BRUTE_FORCE_SUBDOMAINS = [
-  "api","api2","portal","app","pay","payment","payments","checkout",
-  "dashboard","admin","backoffice","gateway","gw","secure","direct",
-  "origin","backend","service","services","ops","staging","dev",
-  "mail","smtp","cdn","static","assets","img","shop","store","web","www2",
-];
-
-const SCORE = { DIRECT_IP: 3, CNAME: 3, HTTP_HEADER: 3, SPF_IP: 2, HISTORICAL: 2 };
-const MAX_API_LOOKUPS = 8;
-
-// ─── Helpers ─────────────────────────────────────────────────
-
-function classifyASN(org = "") {
-  const u = org.toUpperCase();
-  for (const [k, p] of Object.entries(ASN_MAP)) {
-    if (u.includes(k)) return p;
-  }
-  return null;
-}
-
-function classifyCNAME(cname = "") {
-  const l = cname.toLowerCase();
-  for (const { s, p } of CNAME_MAP) { if (l.includes(s)) return p; }
-  return null;
-}
-
-function classifyTechCNAME(cname = "") {
-  const l = cname.toLowerCase();
-  for (const { s, t } of TECH_CNAME_MAP) { if (l.includes(s)) return t; }
-  return null;
-}
-
-// Prefixes that are noise — email security records, tracking links, etc.
-const SKIP_PREFIXES = ["mta-sts.", "ablink.", "em.", "bounce.", "mail.", "smtp.", "click.", "track.", "open.", "list-manage.", "list."];
-
-function isValidSubdomain(name, base) {
-  if (name.includes("@") || name.includes("*")) return false;
-  if (!name.endsWith(base) || name.length > 253) return false;
-  // Skip known noise prefixes — email/tracking subdomains with no hosting value
-  const label = name.replace("." + base, "");
-  if (SKIP_PREFIXES.some(p => label === p.replace(".", "") || label.startsWith(p))) return false;
-  return true;
-}
-
-async function safeFetch(url, opts = {}, ms = 5000) {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ms);
-    const res = await fetch(url, { ...opts, signal: controller.signal });
-    clearTimeout(timer);
-    return res;
-  } catch { return null; }
-}
-
-// ─── IP Classification ────────────────────────────────────────
-
-async function classifyIPsBulk(ipList) {
-  const unique = [...new Set(ipList)];
-  const result = {};
-  const needsAPI = [];
-  for (const ip of unique) {
-    const local = classifyIPLocal(ip);
-    if (local) result[ip] = { ip, org: local, provider: local, country: null, source: "local" };
-    else needsAPI.push(ip);
-  }
-  const toQuery = needsAPI.slice(0, MAX_API_LOOKUPS);
-  if (toQuery.length > 0) {
-    const apiResults = await Promise.all(toQuery.map(lookupIPAPI));
-    for (const r of apiResults) result[r.ip] = r;
-  }
-  for (const ip of needsAPI.slice(MAX_API_LOOKUPS)) {
-    result[ip] = { ip, org: "unknown", provider: "Unknown", country: null, source: "skipped" };
-  }
-  return result;
-}
-
-async function lookupIPAPI(ip) {
-  const res = await safeFetch(`https://ipinfo.io/${ip}/json`, {}, 3000);
-  if (!res) return { ip, org: "unknown", provider: "Unknown", country: null, source: "api" };
-  try {
-    const d = await res.json();
-    return { ip, org: d.org || "unknown", provider: classifyASN(d.org || "") || "Unknown", country: d.country || null, source: "api" };
-  } catch { return { ip, org: "unknown", provider: "Unknown", country: null, source: "api" }; }
-}
-
-// ─── DNS ─────────────────────────────────────────────────────
-
-async function dnsQuery(name, type = "A", resolver = "cloudflare") {
-  const url = resolver === "google"
-    ? `https://dns.google/resolve?name=${encodeURIComponent(name)}&type=${type}`
-    : `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`;
-  const res = await safeFetch(url, { headers: { Accept: "application/dns-json" } }, 4000);
-  if (!res) return [];
-  try { const d = await res.json(); return d.Answer || []; } catch { return []; }
-}
-
-async function dnsQueryWithFallback(name, type = "A") {
-  const primary = await dnsQuery(name, type, "cloudflare");
-  if (primary.length > 0) return primary;
-  return dnsQuery(name, type, "google");
-}
-
-async function resolveToA(domain, depth = 0) {
-  if (depth > 6) return { ips: [], cnames: [] };
-  const records = await dnsQueryWithFallback(domain, "A");
-  const ips = [], cnames = [];
-  for (const r of records) {
-    if (r.type === 1) ips.push(r.data);
-    else if (r.type === 5) {
-      const target = r.data.replace(/\.$/, "");
-      cnames.push(target);
-      const followed = await resolveToA(target, depth + 1);
-      ips.push(...followed.ips);
-      cnames.push(...followed.cnames);
-    }
-  }
-  return { ips: [...new Set(ips)], cnames: [...new Set(cnames)] };
-}
-
-// ─── Subdomain Discovery ──────────────────────────────────────
-
-// Source 1: crt.sh certificate transparency logs
-async function getSubdomainsFromCrt(domain) {
-  let res = await safeFetch(`https://crt.sh/?q=%25.${domain}&output=json`, {}, 12000);
-  if (!res) res = await safeFetch(`https://crt.sh/?q=%25.${domain}&output=json`, {}, 12000);
-  if (!res) return new Set();
-  try {
-    const data = await res.json();
-    const names = new Set();
-    for (const entry of data) {
-      for (const raw of [entry.common_name || "", ...(entry.name_value || "").split("\n")]) {
-        const clean = raw.replace(/^\*\./, "").trim().toLowerCase();
-        if (isValidSubdomain(clean, domain) && clean !== domain) names.add(clean);
-      }
-    }
-    return names;
-  } catch { return new Set(); }
-}
-
-// Source 2: HackerTarget host search — free, no key, different scan database
-async function getSubdomainsFromHackerTarget(domain) {
-  const res = await safeFetch(
-    `https://api.hackertarget.com/hostsearch/?q=${domain}`,
-    {}, 8000
-  );
-  if (!res) return new Set();
-  try {
-    const text = await res.text();
-    if (text.includes("error") || text.includes("API count") || text.length < 10) return new Set();
-    const names = new Set();
-    for (const line of text.split("\n")) {
-      const host = line.split(",")[0].trim().toLowerCase();
-      if (isValidSubdomain(host, domain) && host !== domain) names.add(host);
-    }
-    return names;
-  } catch { return new Set(); }
-}
-
-async function getSubdomains(domain) {
-  const priority = [
-    "api","portal","app","pay","dashboard","backoffice",
-    "admin","gateway","checkout","direct","origin","backend",
-    "service","services","ops","staging","dev","secure","payment","payments",
-  ];
-
-  // Run both sources in parallel — results get merged
-  const [fromCrt, fromHT] = await Promise.all([
-    getSubdomainsFromCrt(domain),
-    getSubdomainsFromHackerTarget(domain),
-  ]);
-
-  const merged = new Set([...fromCrt, ...fromHT]);
-
-  if (merged.size > 0) {
-    return [...merged].sort((a, b) => {
-      const aP = priority.some(p => a.startsWith(p + ".")) ? 0 : 1;
-      const bP = priority.some(p => b.startsWith(p + ".")) ? 0 : 1;
-      return aP - bP;
-    }).slice(0, 25);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud Infra Reports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #111418;
+    --bg3: #181c22;
+    --border: #1f2530;
+    --border2: #2a3040;
+    --text: #d4dae6;
+    --muted: #6b7585;
+    --accent: #3b82f6;
+    --accent2: #22d3ee;
+    --green: #10b981;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --aws: #ff9900;
+    --gcp: #4285f4;
+    --sf: #00a1e0;
   }
 
-  // Both sources failed — brute-force common subdomains
-  return BRUTE_FORCE_SUBDOMAINS.map(s => `${s}.${domain}`);
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--accent2); }
+
+  /* ── COMPANY SELECTOR ── */
+  .selector-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .selector-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  #company-select {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 7px 32px 7px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7585' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    min-width: 220px;
+    transition: border-color 0.15s;
+  }
+
+  #company-select:hover { border-color: var(--accent); }
+  #company-select:focus { outline: none; border-color: var(--accent); }
+  #company-select option { background: var(--bg3); }
+
+  .report-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* ── LOADING / EMPTY STATE ── */
+  #loading-state, #empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 16px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 40px 40px 28px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+  }
+
+  .domain-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+  }
+
+  .domain-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 14px;
+  }
+
+  .headline {
+    font-size: 15px;
+    color: var(--text);
+    max-width: 760px;
+    line-height: 1.7;
+    margin-bottom: 28px;
+    opacity: 0.85;
+  }
+
+  /* ── STAT CARDS ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+    gap: 10px;
+  }
+
+  .stat-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+
+  .stat-card .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 5px;
+  }
+
+  .stat-card .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 19px;
+    font-weight: 600;
+  }
+
+  .stat-card .sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .v-gcp    { color: var(--gcp); }
+  .v-aws    { color: var(--aws); }
+  .v-green  { color: var(--green); }
+  .v-yellow { color: var(--yellow); }
+  .v-purple { color: var(--purple); }
+  .v-cyan   { color: var(--accent2); }
+  .v-sf     { color: var(--sf); }
+
+  /* ── CONTENT ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 40px 80px; }
+
+  .section { margin-top: 36px; }
+
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── SIGNALS ── */
+  .signal-grid { display: grid; gap: 8px; }
+
+  .signal-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .signal-card:hover { border-color: var(--border2); }
+
+  .signal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .signal-type {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .type-multi_cloud      { background: rgba(59,130,246,0.15);  color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
+  .type-security_tooling { background: rgba(16,185,129,0.15);  color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
+  .type-payment_infra    { background: rgba(0,161,224,0.15);   color: var(--sf);     border: 1px solid rgba(0,161,224,0.3); }
+  .type-geography        { background: rgba(245,158,11,0.15);  color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+  .type-devops_maturity  { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+
+  .signal-label { font-weight: 500; font-size: 14px; color: #e2e8f0; flex: 1; }
+
+  .chevron { color: var(--muted); font-size: 11px; transition: transform 0.2s; flex-shrink: 0; }
+  .open > .signal-header .chevron,
+  .open > .col-header .chevron,
+  .json-block.open > .json-header .chevron { transform: rotate(90deg); }
+
+  .signal-body {
+    display: none;
+    padding: 0 16px 14px;
+    border-top: 1px solid var(--border);
+  }
+  .signal-card.open .signal-body { display: block; }
+
+  .signal-detail {
+    font-size: 13px;
+    color: var(--text);
+    opacity: 0.8;
+    margin-top: 12px;
+    line-height: 1.7;
+  }
+
+  .signal-email-angle {
+    margin-top: 10px;
+    padding: 11px 13px;
+    background: rgba(59,130,246,0.06);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+    color: #94a3c0;
+    line-height: 1.7;
+  }
+
+  .signal-email-angle strong {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  /* ── COLLAPSIBLE SECTIONS ── */
+  .collapsible-section .col-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .collapsible-section.open .col-header { border-radius: 6px 6px 0 0; border-bottom: none; }
+  .collapsible-section .col-header:hover { background: var(--bg2); }
+
+  .col-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .col-count {
+    font-size: 10px;
+    padding: 2px 7px;
+    background: rgba(107,117,133,0.2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--muted);
+  }
+
+  .collapsible-section .col-body {
+    display: none;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    overflow: hidden;
+  }
+  .collapsible-section.open .col-body { display: block; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+  th {
+    text-align: left;
+    padding: 9px 13px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text);
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .provider-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 10px;
+    white-space: nowrap;
+    margin: 1px;
+  }
+
+  .p-gcp { background: rgba(66,133,244,0.2);  color: #7ab4f5; border: 1px solid rgba(66,133,244,0.3); }
+  .p-aws { background: rgba(255,153,0,0.2);   color: #ffc04d; border: 1px solid rgba(255,153,0,0.3); }
+  .p-sf  { background: rgba(0,161,224,0.2);   color: #60c8ef; border: 1px solid rgba(0,161,224,0.3); }
+  .p-uk  { background: rgba(107,117,133,0.1); color: var(--muted); border: 1px solid var(--border); }
+
+  .ip-list { display: flex; flex-wrap: wrap; gap: 3px; }
+  .ip-chip {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 11px;
+    color: #8892a4;
+  }
+  .cname-chip {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(167,139,250,0.08);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 3px;
+    font-size: 10px;
+    color: #c4b5fd;
+    word-break: break-all;
+    margin: 1px 0;
+  }
+
+  /* ── EMAIL INFRA ── */
+  .infra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .infra-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+
+  .infra-card .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .mx-item {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--green);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .mx-item:last-child { border-bottom: none; }
+
+  .spf-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.8;
+    word-break: break-all;
+  }
+  .spf-include { color: var(--accent2); }
+  .spf-ip      { color: var(--yellow); }
+  .spf-all     { color: var(--red); }
+
+  /* ── JSON BLOCKS ── */
+  .json-block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .json-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 16px;
+    cursor: pointer;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+  }
+
+  .json-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .json-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    background: rgba(107,117,133,0.2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--muted);
+  }
+
+  .json-body { display: none; padding: 16px; overflow-x: auto; }
+  .json-block.open .json-body { display: block; }
+
+  pre {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #8892a4;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  pre .k { color: #7dd3fc; }
+  pre .s { color: #86efac; }
+  pre .n { color: #fda4af; }
+  pre .b { color: #c084fc; }
+
+  code {
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9em;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 20px 40px;
+    border-top: 1px solid var(--border);
+    background: var(--bg2);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  @media (max-width: 700px) {
+    header { flex-direction: column; gap: 12px; align-items: flex-start; padding: 16px 20px; }
+    .hero, .container, footer { padding-left: 20px; padding-right: 20px; }
+    .infra-grid { grid-template-columns: 1fr; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .domain-name { font-size: 18px; }
+    .selector-wrap { flex-wrap: wrap; }
+    #company-select { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Cloud Infra <span>Mapping</span></div>
+  <div class="selector-wrap">
+    <span class="selector-label">Company</span>
+    <select id="company-select">
+      <option value="">— select —</option>
+    </select>
+  </div>
+  <div class="report-meta" id="header-meta">—</div>
+</header>
+
+<!-- EMPTY STATE -->
+<div id="empty-state">
+  <div style="font-size:28px;opacity:0.3">◈</div>
+  <span>Select a company to load its report</span>
+</div>
+
+<!-- LOADING STATE -->
+<div id="loading-state" style="display:none">
+  <div class="spinner"></div>
+  <span>Loading report…</span>
+</div>
+
+<!-- REPORT (hidden until loaded) -->
+<div id="report" style="display:none">
+
+  <div class="hero">
+    <div style="max-width:1100px;margin:0 auto">
+      <div class="domain-label">Target Domain</div>
+      <div class="domain-name" id="r-domain">—</div>
+      <p class="headline" id="r-headline">—</p>
+      <div class="stat-row" id="r-stats"></div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <div class="section">
+      <div class="section-title" id="r-signals-title">AI Analysis — Signals</div>
+      <div class="signal-grid" id="r-signals"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">DNS Subdomain Scan</div>
+      <div class="collapsible-section open" id="subdomain-section">
+        <div class="col-header" onclick="toggleSection('subdomain-section')">
+          <div class="col-title">
+            Subdomains Checked
+            <span class="col-count" id="r-subdomain-count">—</span>
+          </div>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="col-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Subdomain</th>
+                  <th>IP(s)</th>
+                  <th>Provider</th>
+                  <th>CNAME(s)</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="r-subdomain-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Email Infrastructure</div>
+      <div class="infra-grid">
+        <div class="infra-card">
+          <div class="label">MX Records</div>
+          <div id="r-mx"></div>
+        </div>
+        <div class="infra-card">
+          <div class="label">SPF Record</div>
+          <div class="spf-value" id="r-spf"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Tech Stack Hints (HTTP Headers)</div>
+      <div class="infra-grid">
+        <div class="infra-card">
+          <div class="label">Detected Headers</div>
+          <table style="width:100%" id="r-headers-table"></table>
+        </div>
+        <div class="infra-card">
+          <div class="label">Coverage Note</div>
+          <p id="r-coverage" style="font-size:13px;color:var(--text);opacity:0.8;line-height:1.7"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Raw Data Payloads</div>
+      <div style="display:grid;gap:8px">
+        <div class="json-block" id="json-infra">
+          <div class="json-header" onclick="this.parentElement.classList.toggle('open')">
+            <div class="json-title">
+              Cloud Infra Mapping
+              <span class="json-badge" id="json-infra-badge">infra.json</span>
+            </div>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="json-body"><pre id="json-infra-content"></pre></div>
+        </div>
+        <div class="json-block" id="json-ai">
+          <div class="json-header" onclick="this.parentElement.classList.toggle('open')">
+            <div class="json-title">
+              AI Analysis
+              <span class="json-badge" id="json-ai-badge">ai.json</span>
+            </div>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="json-body"><pre id="json-ai-content"></pre></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+
+  <footer>
+    <span id="footer-left">Cloud Infra Mapping</span>
+    <span id="footer-right">—</span>
+  </footer>
+
+</div><!-- /report -->
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ─── HTTP Headers ─────────────────────────────────────────────
-
-async function probeHTTPHeaders(domain) {
-  const signals = [];
-  const tech = {};
-  for (const url of [`https://${domain}`, `https://api.${domain}`]) {
-    const res = await safeFetch(url, {
-      method: "HEAD", redirect: "follow",
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; curl/7.88)" },
-    }, 5000);
-    if (!res) continue;
-    for (const { header, pattern, provider } of HEADER_PROVIDER_MAP) {
-      const val = res.headers.get(header);
-      if (val && pattern.test(val)) {
-        signals.push({ signal: `${header}: ${val.substring(0, 80)} → ${provider}`, provider, source: url, score: SCORE.HTTP_HEADER });
-      }
-    }
-    for (const h of TECH_HEADERS) {
-      const val = res.headers.get(h);
-      if (val) tech[h] = val.substring(0, 120);
-    }
-    const cfRay = res.headers.get("cf-ray");
-    if (cfRay) tech["cf-ray"] = cfRay;
-  }
-  return { signals, tech_stack_hints: tech };
-}
-
-// ─── SPF / Email ──────────────────────────────────────────────
-
-async function parseSPFIPs(spfRecord, ipCache) {
-  if (!spfRecord) return [];
-  const matches = spfRecord.match(/ip4:([\d.\/]+)/g) || [];
-  const ips = matches.map(m => m.replace("ip4:", "").split("/")[0])
-    .filter(ip => ip && !ip.startsWith("0.")).slice(0, 8);
-
-  // Group by provider — cap total SPF contribution at 3pts per provider.
-  // SPF reveals email infra, not app hosting. Without a cap, 4x Azure email
-  // IPs (8pts) can outrank 12x direct AWS app IPs (36pts) which is wrong.
-  const providerIPs = {};
-  for (const ip of ips) {
-    const local = classifyIPLocal(ip);
-    const provider = local || ipCache[ip]?.provider || "Unknown";
-    if (provider && provider !== "Unknown" && !CDN_PROVIDERS.has(provider)) {
-      (providerIPs[provider] = providerIPs[provider] || []).push(ip);
-    }
-  }
-  const signals = [];
-  for (const [provider, provIPs] of Object.entries(providerIPs)) {
-    const label = provIPs.slice(0,2).join(", ") + (provIPs.length > 2 ? ` (+${provIPs.length-2} more)` : "");
-    signals.push({ signal: `SPF ${label} → ${provider}`, provider, source: "SPF", score: 3 });
-  }
-  return signals;
-}
-
-async function getEmailInfra(domain) {
-  const [mxRaw, txtRaw] = await Promise.all([
-    dnsQueryWithFallback(domain, "MX"),
-    dnsQueryWithFallback(domain, "TXT"),
-  ]);
-  const mx = mxRaw.filter(r => r.type === 15).map(r => r.data.replace(/^\d+\s+/, "").trim().toLowerCase());
-  const txt = txtRaw.filter(r => r.type === 16).map(r => r.data.replace(/"/g, "").trim());
-  const spf = txt.find(r => r.startsWith("v=spf1")) || null;
-
-  let emailProvider = "Unknown";
-  if (mx.some(m => m.includes("google") || m.includes("googlemail") || m.includes("smtp.google"))) emailProvider = "Google Workspace";
-  else if (mx.some(m => m.includes("outlook") || m.includes("protection.outlook"))) emailProvider = "Microsoft 365";
-  else if (mx.some(m => m.includes("amazonaws"))) emailProvider = "AWS SES";
-  else if (spf?.includes("sendgrid")) emailProvider = "SendGrid";
-  else if (spf?.includes("mailgun")) emailProvider = "Mailgun";
-
-  return { email_provider: emailProvider, mx_records: mx, spf_record: spf };
-}
-
-// ─── Historical DNS ───────────────────────────────────────────
-
-async function getHistoricalDNS(domain, apiKey, ipCache) {
-  if (!apiKey) return [];
-  const res = await safeFetch(
-    `https://api.securitytrails.com/v1/history/${domain}/dns/a`,
-    { headers: { apikey: apiKey, Accept: "application/json" } }, 6000
-  );
-  if (!res) return [];
-  try {
-    const d = await res.json();
-    const signals = [];
-    for (const record of d.records || []) {
-      for (const v of record.values || []) {
-        const ip = v.ip; if (!ip) continue;
-        const local = classifyIPLocal(ip);
-        const provider = local || ipCache[ip]?.provider || "Unknown";
-        if (provider && provider !== "Unknown" && !CDN_PROVIDERS.has(provider)) {
-          signals.push({ signal: `Historical DNS: ${ip} → ${provider} (${record.last_seen || "unknown"})`, provider, source: "SecurityTrails", score: SCORE.HISTORICAL });
-        }
-      }
-    }
-    return signals;
-  } catch { return []; }
-}
-
-// ─── Verdict Builder ──────────────────────────────────────────
-
-function buildVerdict(allSignals, selfHosted) {
-  const providerScores = {}, cdnScores = {};
-  const providerEvidence = {}, cdnEvidence = {};
-  for (const s of allSignals) {
-    const p = s.provider; if (!p || p === "Unknown") continue;
-    if (CDN_PROVIDERS.has(p)) {
-      cdnScores[p] = (cdnScores[p] || 0) + (s.score || 1);
-      (cdnEvidence[p] = cdnEvidence[p] || []).push(s.signal);
-    } else {
-      providerScores[p] = (providerScores[p] || 0) + (s.score || 1);
-      (providerEvidence[p] = providerEvidence[p] || []).push(s.signal);
-    }
-  }
-  const topProvider = Object.entries(providerScores).sort((a, b) => b[1] - a[1])[0];
-  const topCDN = Object.entries(cdnScores).sort((a, b) => b[1] - a[1])[0];
-
-  let verdict, confidence, reasoning, evidence;
-  if (topProvider && topProvider[1] >= 6) {
-    verdict = topProvider[0]; confidence = "high";
-    evidence = providerEvidence[topProvider[0]];
-    reasoning = `Score ${topProvider[1]} — multiple independent signals confirm ${verdict}`;
-    if (topCDN) reasoning += `. Front-end behind ${topCDN[0]}`;
-  } else if (topProvider && topProvider[1] >= 3) {
-    verdict = topProvider[0]; confidence = "medium";
-    evidence = providerEvidence[topProvider[0]];
-    reasoning = `Score ${topProvider[1]} — signals lean toward ${verdict}`;
-    if (topCDN) reasoning += `. Front-end behind ${topCDN[0]}`;
-  } else if (topProvider) {
-    verdict = topProvider[0]; confidence = "low";
-    evidence = providerEvidence[topProvider[0]];
-    reasoning = `Score ${topProvider[1]} — weak signal, needs more evidence`;
-    if (topCDN) reasoning += `. Front-end behind ${topCDN[0]}`;
-  } else if (selfHosted.is_self_hosted) {
-    verdict = "Self-hosted"; confidence = "medium";
-    evidence = [selfHosted.signal];
-    reasoning = `IPs resolve to own infrastructure (${selfHosted.org})`;
-  } else if (topCDN) {
-    verdict = topCDN[0]; confidence = "low";
-    evidence = cdnEvidence[topCDN[0]];
-    reasoning = `All signals hidden behind ${topCDN[0]}. Could not pierce CDN.`;
-  } else {
-    verdict = "Unknown"; confidence = "none"; evidence = [];
-    reasoning = "No usable DNS or header signals found";
-  }
-
-  // All providers detected (for multi-cloud insight)
-  const allProviders = Object.keys(providerScores);
-
-  return { verdict, confidence, reasoning, evidence, cdn_fronted: !!topCDN, cdn_provider: topCDN ? topCDN[0] : null, score: topProvider ? topProvider[1] : 0, all_providers: allProviders };
-}
-
-// ─── Self-hosted Detection ────────────────────────────────────
-
-function detectSelfHosted(subdomainResults, ipCache, domain) {
-  const domainRoot = domain.split(".")[0].toLowerCase();
-  for (const r of subdomainResults) {
-    for (const ip of r.rawIPs) {
-      const info = ipCache[ip];
-      if (info && info.org && info.org !== "unknown" && info.provider === "Unknown") {
-        const orgLower = info.org.toLowerCase();
-        // Exclude known WAFs/CDNs that show up as Unknown
-        if (orgLower.includes("incapsula") || orgLower.includes("imperva") || orgLower.includes("cloudflare")) continue;
-        if (orgLower.includes(domainRoot) || info.org.match(/^AS\d+ .+/)) {
-          return { is_self_hosted: true, org: info.org, signal: `IPs resolve to own ASN: ${info.org}` };
-        }
-      }
-    }
-  }
-  return { is_self_hosted: false };
-}
-
-// ─── Main Handler ─────────────────────────────────────────────
-
-async function handleRequest(request, env = {}) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    }});
-  }
-  if (request.method !== "POST") return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
-
-  let body;
-  try { body = await request.json(); }
-  catch { return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 }); }
-
-  const domain = (body.domain || "").toLowerCase()
-    .replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim();
-  if (!domain) return new Response(JSON.stringify({ error: "Missing domain" }), { status: 400 });
-
-  // Phase 1: Parallel gathering
-  const [subdomains, emailInfra, headerProbe] = await Promise.all([
-    getSubdomains(domain),
-    getEmailInfra(domain),
-    probeHTTPHeaders(domain),
-  ]);
-
-  // Phase 2: Resolve all subdomains
-  const rawResults = await Promise.all(
-    [domain, ...subdomains].map(async (sub) => {
-      const { ips, cnames } = await resolveToA(sub);
-      return { subdomain: sub, rawIPs: ips, cnames };
-    })
-  );
-
-  // Phase 3: Classify IPs — local first, API capped
-  const allUniqueIPs = [...new Set(rawResults.flatMap(r => r.rawIPs))];
-  const ipCache = await classifyIPsBulk(allUniqueIPs);
-
-  const subdomainResults = rawResults.map(r => ({
-    subdomain: r.subdomain,
-    cnames: r.cnames,
-    rawIPs: r.rawIPs,
-    ips: r.rawIPs.map(ip => ipCache[ip] || { ip, org: "unknown", provider: "Unknown" }),
-  }));
-
-  // Phase 4: Build signals
-  const techCNAMEHints = {};
-  const dnsSignals = [];
-
-  for (const r of subdomainResults) {
-    for (const cname of r.cnames) {
-      const p = classifyCNAME(cname);
-      if (p) dnsSignals.push({ signal: `CNAME ${r.subdomain} → ${cname}`, provider: p, source: "CNAME", score: SCORE.CNAME });
-      const t = classifyTechCNAME(cname);
-      if (t) {
-        techCNAMEHints[t] = techCNAMEHints[t] || [];
-        if (!techCNAMEHints[t].includes(r.subdomain)) techCNAMEHints[t].push(r.subdomain);
-      }
-    }
-    for (const ipInfo of r.ips) {
-      if (ipInfo.provider && ipInfo.provider !== "Unknown") {
-        dnsSignals.push({ signal: `IP ${ipInfo.ip} (${ipInfo.org}) via ${r.subdomain}`, provider: ipInfo.provider, source: "DNS A record", score: SCORE.DIRECT_IP });
-      }
-    }
-  }
-
-  const spfSignals = await parseSPFIPs(emailInfra.spf_record, ipCache);
-  const historicalSignals = await getHistoricalDNS(domain, env.SECURITYTRAILS_KEY, ipCache);
-  const selfHosted = detectSelfHosted(subdomainResults, ipCache, domain);
-
-  const allSignals = [...dnsSignals, ...headerProbe.signals, ...spfSignals, ...historicalSignals];
-  const verdict = buildVerdict(allSignals, selfHosted);
-
-  const locallyClassified = Object.values(ipCache).filter(i => i.source === "local").length;
-  const apiClassified = Object.values(ipCache).filter(i => i.source === "api").length;
-  const identified = Object.values(ipCache).filter(i => i.provider !== "Unknown").length;
-
-  const techStackHints = {
-    ...headerProbe.tech_stack_hints,
-    ...(Object.keys(techCNAMEHints).length > 0 ? { third_party_services: techCNAMEHints } : {}),
-    ...(selfHosted.is_self_hosted ? { self_hosted_org: selfHosted.org } : {}),
-  };
-
-  return new Response(JSON.stringify({
-    domain,
-    verdict: verdict.verdict,
-    confidence: verdict.confidence,
-    reasoning: verdict.reasoning,
-    score: verdict.score,
-    evidence: verdict.evidence,
-    cdn_fronted: verdict.cdn_fronted,
-    cdn_provider: verdict.cdn_provider,
-    ip_coverage: `${identified}/${allUniqueIPs.length} IPs identified (${locallyClassified} local, ${apiClassified} API)`,
-    // ── Supporting data ──
-    tech_stack_hints: techStackHints,
-    email_infrastructure: emailInfra,
-    subdomains_checked: subdomainResults
-      .filter(r => r.ips.length > 0 || r.cnames.length > 0)
-      .map(r => ({ subdomain: r.subdomain, cnames: r.cnames, ips: r.ips })),
-    all_signals: allSignals,
-    checked_at: new Date().toISOString(),
-  }, null, 2), {
-    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-  });
-}
-
-// ─── Router ──────────────────────────────────────────────────
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      }});
-    }
-
-    if (path === "/audit") return handleAudit(request, env);
-    return handleRequest(request, env); // default: /scan or /
-  },
-};
-
-// ============================================================
-// /audit endpoint — page-level PCI DSS risk scan
-// POST /audit  { "domain": "example.com" }
-// Fetches real page HTML, detects third-party scripts,
-// session recorders, payment processors, auth signals, CSP gaps
-// ============================================================
-
-// ─── Known Vendor Fingerprints ────────────────────────────────
-
-const SESSION_RECORDERS = [
-  { domain: "hotjar.com",          name: "Hotjar",          risk: "critical" },
-  { domain: "fullstory.com",       name: "FullStory",       risk: "critical" },
-  { domain: "logrocket.com",       name: "LogRocket",       risk: "critical" },
-  { domain: "mouseflow.com",       name: "Mouseflow",       risk: "critical" },
-  { domain: "smartlook.com",       name: "Smartlook",       risk: "critical" },
-  { domain: "clarity.ms",          name: "Microsoft Clarity",risk: "critical" },
-  { domain: "sessioncam.com",      name: "SessionCam",      risk: "critical" },
-  { domain: "quantummetric.com",   name: "Quantum Metric",  risk: "critical" },
-  { domain: "decibel.com",         name: "Decibel Insight",  risk: "critical" },
-  { domain: "heap.io",             name: "Heap",            risk: "high" },
-  { domain: "heapanalytics.com",   name: "Heap Analytics",  risk: "high" },
-  { domain: "inspectlet.com",      name: "Inspectlet",      risk: "high" },
-];
-
-const PAYMENT_PROCESSORS = [
-  { domain: "js.stripe.com",           name: "Stripe",          method: "js-sdk" },
-  { domain: "stripe.com",              name: "Stripe",          method: "api" },
-  { domain: "checkout.stripe.com",     name: "Stripe Checkout", method: "hosted" },
-  { domain: "js.braintreegateway.com", name: "Braintree",       method: "js-sdk" },
-  { domain: "braintreegateway.com",    name: "Braintree",       method: "api" },
-  { domain: "paypalobjects.com",       name: "PayPal",          method: "js-sdk" },
-  { domain: "paypal.com",              name: "PayPal",          method: "api" },
-  { domain: "checkout.com",            name: "Checkout.com",    method: "api" },
-  { domain: "cdn.checkout.com",        name: "Checkout.com",    method: "js-sdk" },
-  { domain: "pay.adyen.com",           name: "Adyen",           method: "hosted" },
-  { domain: "checkoutshopper-live.adyen.com", name: "Adyen",   method: "js-sdk" },
-  { domain: "secure.worldpay.com",     name: "Worldpay",        method: "hosted" },
-  { domain: "klarna.com",              name: "Klarna",          method: "api" },
-  { domain: "x.klarnacdn.net",         name: "Klarna",          method: "js-sdk" },
-  { domain: "authorize.net",           name: "Authorize.net",   method: "api" },
-  { domain: "accept.authorize.net",    name: "Authorize.net",   method: "hosted" },
-  { domain: "square.com",              name: "Square",          method: "api" },
-  { domain: "js.squareup.com",         name: "Square",          method: "js-sdk" },
-  { domain: "razorpay.com",            name: "Razorpay",        method: "api" },
-  { domain: "cdn.razorpay.com",        name: "Razorpay",        method: "js-sdk" },
-];
-
-const KNOWN_IDPS = [
-  { domain: "okta.com",            name: "Okta" },
-  { domain: "auth0.com",           name: "Auth0" },
-  { domain: "login.microsoftonline.com", name: "Azure AD" },
-  { domain: "accounts.google.com", name: "Google Identity" },
-  { domain: "cognito-idp",         name: "AWS Cognito" },
-  { domain: "ping.com",            name: "Ping Identity" },
-  { domain: "onelogin.com",        name: "OneLogin" },
-  { domain: "forgerock.com",       name: "ForgeRock" },
-  { domain: "duo.com",             name: "Duo Security" },
-];
-
-const ERROR_TRACKERS = [
-  { domain: "sentry.io",           name: "Sentry" },
-  { domain: "ingest.sentry.io",    name: "Sentry" },
-  { domain: "browser.sentry-cdn.com", name: "Sentry" },
-  { domain: "bugsnag.com",         name: "Bugsnag" },
-  { domain: "rollbar.com",         name: "Rollbar" },
-  { domain: "raygun.io",           name: "Raygun" },
-  { domain: "newrelic.com",        name: "New Relic" },
-  { domain: "datadoghq.com",       name: "Datadog" },
-  { domain: "appdynamics.com",     name: "AppDynamics" },
-];
-
-// High-risk third parties that expand PCI scope when on payment/login pages
-const HIGH_RISK_THIRD_PARTIES = [
-  "googletagmanager.com", "google-analytics.com", "analytics.google.com",
-  "facebook.net", "connect.facebook.net", "facebook.com",
-  "doubleclick.net", "googleadservices.com",
-  "intercom.io", "widget.intercom.io",
-  "js.intercomcdn.com", "crisp.chat", "client.crisp.chat",
-  "drift.com", "js.drift.com",
-  "zopim.com", "static.zdassets.com",
-];
-
-// ─── CSP Parser ───────────────────────────────────────────────
-
-function parseCSP(cspHeader) {
-  if (!cspHeader) return {};
-  const directives = {};
-  for (const part of cspHeader.split(";")) {
-    const [directive, ...values] = part.trim().split(/\s+/);
-    if (directive) directives[directive.toLowerCase()] = values;
-  }
-  return directives;
-}
-
-function extractCSPDomains(cspHeader) {
-  const directives = parseCSP(cspHeader);
-  const allDomains = new Set();
-  const byDirective = {};
-
-  for (const [directive, values] of Object.entries(directives)) {
-    const domains = values
-      .filter(v => v.includes(".") && !v.startsWith("'") && v !== "*")
-      .map(v => v.replace(/^https?:\/\//, "").split("/")[0].replace(/^\*\./, ""));
-    if (domains.length > 0) {
-      byDirective[directive] = domains;
-      domains.forEach(d => allDomains.add(d));
-    }
-  }
-
-  return { allDomains: [...allDomains], byDirective };
-}
-
-// ─── Page Fetcher ─────────────────────────────────────────────
-
-async function fetchPage(url, ms = 8000) {
-  const res = await safeFetch(url, {
-    method: "GET",
-    redirect: "follow",
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-  }, ms);
-  if (!res) return { html: null, headers: {}, status: null, finalUrl: url };
-
-  const html = await res.text().catch(() => null);
-  const headers = {};
-  for (const [k, v] of res.headers.entries()) headers[k.toLowerCase()] = v;
-  return { html, headers, status: res.status, finalUrl: res.url || url };
-}
-
-// ─── Script Extractor ─────────────────────────────────────────
-
-function extractScriptDomains(html) {
-  if (!html) return [];
-  const domains = new Set();
-
-  // External script src
-  const scriptSrcRegex = /<script[^>]+src=["']([^"']+)["']/gi;
-  let m;
-  while ((m = scriptSrcRegex.exec(html)) !== null) {
-    try {
-      const src = m[1];
-      if (src.startsWith("http") || src.startsWith("//")) {
-        const domain = src.replace(/^\/\//, "https://").replace(/^https?:\/\//, "").split("/")[0];
-        if (domain.includes(".")) domains.add(domain.toLowerCase());
-      }
-    } catch {}
-  }
-
-  // Inline script content patterns for known tools
-  const inlinePatterns = [
-    { pattern: /hotjar\.com/i,        domain: "hotjar.com" },
-    { pattern: /fullstory\.com/i,     domain: "fullstory.com" },
-    { pattern: /logrocket\.com/i,     domain: "logrocket.com" },
-    { pattern: /clarity\.ms/i,        domain: "clarity.ms" },
-    { pattern: /mouseflow\.com/i,     domain: "mouseflow.com" },
-    { pattern: /googletagmanager/i,   domain: "googletagmanager.com" },
-  ];
-  for (const { pattern, domain } of inlinePatterns) {
-    if (pattern.test(html)) domains.add(domain);
-  }
-
-  return [...domains];
-}
-
-// ─── Form Analyser — detect custom payment forms ──────────────
-
-function analysePaymentForms(html) {
-  if (!html) return { has_custom_payment_form: false };
-
-  // Look for card number input fields
-  const cardInputPatterns = [
-    /type=["']?(?:tel|number|text)["']?[^>]*(?:card[-_]?(?:number|num|no)|cc[-_]?num|pan|cardnum)/i,
-    /(?:card[-_]?(?:number|num|no)|cc[-_]?num|pan|cardnum)[^>]*type=["']?(?:tel|number|text)["']?/i,
-    /placeholder=["'][^"']*(?:card\s*number|\d{4}\s*\d{4}|•{4})/i,
-    /name=["'][^"']*(?:cardNumber|card_number|cc_number|pan)[^"']*/i,
-    /id=["'][^"']*(?:cardNumber|card-number|cc-number|card_number)[^"']*/i,
-  ];
-
-  for (const pattern of cardInputPatterns) {
-    if (pattern.test(html)) {
-      return {
-        has_custom_payment_form: true,
-        risk: "critical",
-        finding: "Card number input field detected directly in page HTML — potential custom payment form not using an iframe-isolated payment SDK",
-      };
-    }
-  }
-
-  return { has_custom_payment_form: false };
-}
-
-// ─── Auth Signal Detector ─────────────────────────────────────
-
-function detectAuthSignals(html, headers, pageUrl) {
-  const signals = [];
-
-  // Cookie flags
-  const setCookie = headers["set-cookie"] || "";
-  if (setCookie) {
-    if (!/secure/i.test(setCookie)) signals.push({ risk: "high", finding: "Session cookie missing Secure flag", requirement: "PCI DSS Req 6.2.4" });
-    if (!/httponly/i.test(setCookie)) signals.push({ risk: "high", finding: "Session cookie missing HttpOnly flag", requirement: "PCI DSS Req 6.2.4" });
-    if (!/samesite/i.test(setCookie)) signals.push({ risk: "medium", finding: "Session cookie missing SameSite flag", requirement: "PCI DSS Req 6.2.4" });
-  }
-
-  // HSTS
-  if (!headers["strict-transport-security"]) {
-    signals.push({ risk: "medium", finding: "HSTS header missing — site susceptible to SSL stripping", requirement: "PCI DSS Req 4.2.1" });
-  }
-
-  // X-Frame-Options / clickjacking
-  if (!headers["x-frame-options"] && !headers["content-security-policy"]?.includes("frame-ancestors")) {
-    signals.push({ risk: "medium", finding: "No clickjacking protection (X-Frame-Options or CSP frame-ancestors missing)", requirement: "PCI DSS Req 6.2.4" });
-  }
-
-  // JWT in URL (check current page URL)
-  if (/[?&](?:token|jwt|auth|access_token)=ey[A-Za-z0-9]/i.test(pageUrl)) {
-    signals.push({ risk: "critical", finding: "JWT or auth token visible in URL — tokens in URLs get logged in server logs and browser history", requirement: "PCI DSS Req 8.2.1" });
-  }
-
-  // Check for known IdP redirect patterns in HTML
-  let detectedIdP = null;
-  if (html) {
-    for (const { domain, name } of KNOWN_IDPS) {
-      if (html.includes(domain)) { detectedIdP = name; break; }
-    }
-  }
-
-  return { signals, detected_idp: detectedIdP };
-}
-
-// ─── Risk Classifier ──────────────────────────────────────────
-
-function classifyThirdPartyRisk(domain, pagePath, scriptDomains, cspDomains) {
-  const findings = [];
-  const isSensitivePage = /login|signin|checkout|pay|payment|card|account|dashboard/i.test(pagePath);
-
-  // Check session recorders
-  for (const recorder of SESSION_RECORDERS) {
-    if (scriptDomains.includes(recorder.domain) || cspDomains.includes(recorder.domain)) {
-      findings.push({
-        category: "session_recording",
-        risk: recorder.risk,
-        tool: recorder.name,
-        domain: recorder.domain,
-        on_sensitive_page: isSensitivePage,
-        finding: `${recorder.name} session recorder detected${isSensitivePage ? " on sensitive page" : ""}`,
-        requirement: "PCI DSS Req 6.4.3",
-        detail: `${recorder.name} captures DOM snapshots which may include card numbers or sensitive form inputs. Req 6.4.3 requires explicit justification and masking controls for all scripts on payment pages.`,
-      });
-    }
-  }
-
-  // Check payment processors
-  for (const processor of PAYMENT_PROCESSORS) {
-    if (scriptDomains.includes(processor.domain) || cspDomains.includes(processor.domain)) {
-      findings.push({
-        category: "payment_processor",
-        risk: "info",
-        tool: processor.name,
-        domain: processor.domain,
-        method: processor.method,
-        finding: `${processor.name} payment integration detected (${processor.method})`,
-        requirement: "PCI DSS Req 6.4.3",
-        detail: `${processor.name} via ${processor.method}. Hosted/iframe methods reduce PCI scope. Direct JS SDK integrations require full SAQ A-EP or SAQ D assessment.`,
-      });
-    }
-  }
-
-  // High-risk third parties on sensitive pages
-  if (isSensitivePage) {
-    for (const domain of HIGH_RISK_THIRD_PARTIES) {
-      if (scriptDomains.includes(domain) || cspDomains.includes(domain)) {
-        findings.push({
-          category: "third_party_js",
-          risk: "high",
-          tool: domain,
-          domain: domain,
-          on_sensitive_page: true,
-          finding: `${domain} loaded on sensitive page (${pagePath})`,
-          requirement: "PCI DSS Req 6.4.3",
-          detail: `Third-party scripts on payment/login pages must be inventoried and justified under PCI DSS v4.0 Req 6.4.3. ${domain} loading here expands your compliance scope.`,
-        });
-      }
-    }
-  }
-
-  // GTM — special case, it's a container for invisible third parties
-  if (scriptDomains.includes("googletagmanager.com") || cspDomains.includes("googletagmanager.com")) {
-    findings.push({
-      category: "third_party_js",
-      risk: isSensitivePage ? "critical" : "high",
-      tool: "Google Tag Manager",
-      domain: "googletagmanager.com",
-      on_sensitive_page: isSensitivePage,
-      finding: `GTM detected${isSensitivePage ? " on sensitive page" : ""} — acts as an uncontrolled third-party container`,
-      requirement: "PCI DSS Req 6.4.3",
-      detail: "GTM is a vector for scope creep — any tag added by marketing fires on the pages it's installed on. Under PCI DSS v4.0, every script GTM injects must also be inventoried and justified. An auditor cannot see what's inside GTM from outside.",
+function highlight(obj) {
+  return JSON.stringify(obj, null, 2)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      let c = 'n';
+      if (/^"/.test(m)) c = /:$/.test(m) ? 'k' : 's';
+      else if (/true|false/.test(m)) c = 'b';
+      return `<span class="${c}">${m}</span>`;
     });
-  }
-
-  return findings;
 }
 
-// ─── Audit Handler ────────────────────────────────────────────
+function providerBadge(provider, org) {
+  if (provider === 'GCP') return '<span class="provider-badge p-gcp">GCP</span>';
+  if (provider === 'AWS') return '<span class="provider-badge p-aws">AWS</span>';
+  if (org && org.includes('Salesforce')) return '<span class="provider-badge p-sf">Salesforce</span>';
+  return '<span class="provider-badge p-uk">Unknown</span>';
+}
 
-async function handleAudit(request, env = {}) {
-  if (request.method !== "POST") return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('open');
+}
 
-  let body;
-  try { body = await request.json(); }
-  catch { return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 }); }
+// ── Load companies.json and populate selector ─────────────────────────────
 
-  const domain = (body.domain || "").toLowerCase()
-    .replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim();
-  if (!domain) return new Response(JSON.stringify({ error: "Missing domain" }), { status: 400 });
-
-  // Pages to scan — root always, plus common sensitive paths
-  const pagesToScan = [
-    { path: "/",         label: "homepage" },
-    { path: "/login",    label: "login" },
-    { path: "/signin",   label: "login" },
-    { path: "/checkout", label: "checkout" },
-    { path: "/pay",      label: "payment" },
-    { path: "/payment",  label: "payment" },
-  ];
-
-  // Fetch all pages in parallel
-  const pageResults = await Promise.all(
-    pagesToScan.map(async ({ path, label }) => {
-      const url = `https://${domain}${path}`;
-      const result = await fetchPage(url, 7000);
-      return { path, label, url, ...result };
-    })
-  );
-
-  // Deduplicate by final URL (redirects often collapse /login → / etc.)
-  const seenUrls = new Set();
-  const scannedPages = pageResults.filter(p => {
-    if (!p.html || p.status === 404) return false;
-    if (seenUrls.has(p.finalUrl)) return false;
-    seenUrls.add(p.finalUrl);
-    return true;
-  });
-
-  // Aggregate findings across all pages
-  const allFindings = [];
-  const allScriptDomains = new Set();
-  const cspInventory = {};
-  const authSignals = [];
-  let gtmDetected = false;
-  let customPaymentFormDetected = false;
-  const paymentFormDetails = [];
-
-  for (const page of scannedPages) {
-    const scriptDomains = extractScriptDomains(page.html);
-    scriptDomains.forEach(d => allScriptDomains.add(d));
-
-    // Parse CSP
-    const cspHeader = page.headers["content-security-policy"] || "";
-    const { allDomains: cspDomains, byDirective } = extractCSPDomains(cspHeader);
-
-    // Classify findings for this page
-    const findings = classifyThirdPartyRisk(domain, page.path, scriptDomains, cspDomains);
-    allFindings.push(...findings.map(f => ({ ...f, page: page.path })));
-
-    // Merge CSP inventory
-    for (const [directive, domains] of Object.entries(byDirective)) {
-      cspInventory[directive] = [...new Set([...(cspInventory[directive] || []), ...domains])];
-    }
-
-    // Auth signals from homepage and login pages
-    if (page.label === "homepage" || page.label === "login") {
-      const auth = detectAuthSignals(page.html, page.headers, page.finalUrl);
-      authSignals.push(...auth.signals.map(s => ({ ...s, page: page.path })));
-    }
-
-    // Custom payment form check on payment/checkout pages
-    if (page.label === "checkout" || page.label === "payment") {
-      const formCheck = analysePaymentForms(page.html);
-      if (formCheck.has_custom_payment_form) {
-        customPaymentFormDetected = true;
-        paymentFormDetails.push({ page: page.path, ...formCheck });
-      }
-    }
-
-    if (scriptDomains.includes("googletagmanager.com")) gtmDetected = true;
-  }
-
-  // Deduplicate findings by tool+page
-  const seen = new Set();
-  const dedupedFindings = allFindings.filter(f => {
-    const key = `${f.tool}:${f.page}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  // Identify unknown third-party script domains
-  const knownDomains = new Set([
-    ...SESSION_RECORDERS.map(r => r.domain),
-    ...PAYMENT_PROCESSORS.map(p => p.domain),
-    ...KNOWN_IDPS.map(i => i.domain),
-    ...ERROR_TRACKERS.map(e => e.domain),
-    ...HIGH_RISK_THIRD_PARTIES,
-    domain, `www.${domain}`,
-    "cloudflare.com", "cloudflareinsights.com",
-    "googleapis.com", "gstatic.com", "google.com",
-    "jquery.com", "jsdelivr.net", "cdnjs.cloudflare.com",
-    "unpkg.com", "bootstrapcdn.com",
-  ]);
-
-  const unknownThirdParties = [...allScriptDomains].filter(d =>
-    !d.endsWith(domain) && !knownDomains.has(d) &&
-    !Array.from(knownDomains).some(k => d.endsWith(k))
-  );
-
-  // Risk summary
-  const criticalCount = dedupedFindings.filter(f => f.risk === "critical").length;
-  const highCount = dedupedFindings.filter(f => f.risk === "high").length;
-  const overallRisk = criticalCount > 0 ? "critical" : highCount > 0 ? "high" : "medium";
-
-  // Custom payment form is the most critical possible finding — surface it prominently
-  if (customPaymentFormDetected) {
-    dedupedFindings.unshift({
-      category: "payment_form",
-      risk: "critical",
-      tool: "Custom payment form",
-      page: paymentFormDetails[0]?.page || "/checkout",
-      finding: "Card number input field detected directly in page HTML",
-      requirement: "PCI DSS Req 4.2.1 / SAQ D scope",
-      detail: "A card number input field was found directly in the page HTML rather than inside an isolated payment iframe. This indicates full card data may be touching the server, requiring SAQ D or ROC assessment scope — the most complex PCI DSS compliance path.",
+async function init() {
+  try {
+    const res = await fetch('data/companies.json');
+    const companies = await res.json();
+    const sel = document.getElementById('company-select');
+    companies.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.domain ? ` — ${c.domain}` : '');
+      sel.appendChild(opt);
     });
+
+    // Support ?company=slug in URL
+    const params = new URLSearchParams(location.search);
+    if (params.get('company')) {
+      sel.value = params.get('company');
+      loadCompany(params.get('company'));
+    }
+  } catch(e) {
+    console.error('Failed to load companies.json', e);
+  }
+}
+
+document.getElementById('company-select').addEventListener('change', e => {
+  const id = e.target.value;
+  if (!id) { showEmpty(); return; }
+  // Update URL without reload
+  history.replaceState(null, '', `?company=${id}`);
+  loadCompany(id);
+});
+
+// ── Load & render a company ───────────────────────────────────────────────
+
+async function loadCompany(id) {
+  showLoading();
+  try {
+    const [infraRes, aiRes] = await Promise.all([
+      fetch(`data/${id}/infra.json`),
+      fetch(`data/${id}/ai.json`)
+    ]);
+    if (!infraRes.ok || !aiRes.ok) throw new Error('File not found');
+    const infra = await infraRes.json();
+    const ai    = await aiRes.json();
+    renderReport(infra, ai, id);
+    showReport();
+  } catch(e) {
+    showEmpty();
+    console.error('Error loading company data:', e);
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+
+function renderReport(infra, ai, id) {
+
+  // Header meta
+  const checkedAt = infra.checked_at ? new Date(infra.checked_at).toLocaleString() : '—';
+  document.getElementById('header-meta').innerHTML =
+    `Checked: ${checkedAt}<br>Confidence: <span style="color:var(--green)">${(infra.confidence||'').toUpperCase()}</span>`;
+
+  // Hero
+  document.getElementById('r-domain').textContent = infra.domain || id;
+  document.getElementById('r-headline').textContent = ai.headline || ai.hostingSummary || '';
+
+  // Stat cards
+  const subCount = Array.isArray(infra.subdomains_checked) ? infra.subdomains_checked.length : '?';
+  const providers = new Set();
+  if (Array.isArray(infra.all_signals)) {
+    infra.all_signals.forEach(s => s.provider && s.provider !== 'Unknown' && providers.add(s.provider));
   }
 
-  return new Response(JSON.stringify({
-    domain,
-    overall_risk: overallRisk,
-    summary: {
-      critical_findings: criticalCount + (customPaymentFormDetected ? 1 : 0),
-      high_findings: highCount,
-      pages_scanned: scannedPages.map(p => ({ path: p.path, label: p.label, status: p.status })),
-      gtm_detected: gtmDetected,
-      custom_payment_form: customPaymentFormDetected,
-    },
-    pci_risk_findings: dedupedFindings,
-    auth_signals: authSignals,
-    third_party_inventory: {
-      all_script_domains: [...allScriptDomains].sort(),
-      unknown_domains: unknownThirdParties,
-      csp_by_directive: cspInventory,
-    },
-    checked_at: new Date().toISOString(),
-  }, null, 2), {
-    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  const verdictColor = {GCP:'v-gcp', AWS:'v-aws', Azure:'v-cyan'}[infra.verdict] || 'v-green';
+
+  document.getElementById('r-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Verdict</div>
+      <div class="value ${verdictColor}">${esc(infra.verdict||'?')}</div>
+      <div class="sub">Primary cloud</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Confidence Score</div>
+      <div class="value v-green">${esc(infra.score||'?')}</div>
+      <div class="sub">${esc(infra.reasoning||'')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Subdomains Checked</div>
+      <div class="value" style="color:#e2e8f0">${subCount}</div>
+      <div class="sub">${esc(infra.ip_coverage||'')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Cloud Providers</div>
+      <div class="value v-purple">${providers.size || '?'}</div>
+      <div class="sub">${[...providers].join(' · ')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">CDN Fronted</div>
+      <div class="value ${infra.cdn_fronted ? 'v-green' : 'v-yellow'}">${infra.cdn_fronted ? 'Yes' : 'Partial'}</div>
+      <div class="sub">${infra.cdn_provider || 'Cloudflare on primary'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Signals</div>
+      <div class="value v-cyan">${Array.isArray(infra.all_signals) ? infra.all_signals.length : '?'}</div>
+      <div class="sub">Total detection signals</div>
+    </div>
+  `;
+
+  // Signals
+  const sigCount = Array.isArray(ai.signals) ? ai.signals.length : 0;
+  document.getElementById('r-signals-title').textContent = `AI Analysis — ${sigCount} Intelligence Signal${sigCount !== 1 ? 's' : ''}`;
+
+  const sigGrid = document.getElementById('r-signals');
+  sigGrid.innerHTML = '';
+  (ai.signals || []).forEach(sig => {
+    const card = document.createElement('div');
+    card.className = 'signal-card';
+    card.innerHTML = `
+      <div class="signal-header" onclick="this.closest('.signal-card').classList.toggle('open')">
+        <span class="signal-type type-${esc(sig.type)}">${esc(sig.type.replace(/_/g,' '))}</span>
+        <span class="signal-label">${esc(sig.label)}</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="signal-body">
+        <p class="signal-detail">${esc(sig.detail)}</p>
+        <div class="signal-email-angle">
+          <strong>Outreach Angle</strong>
+          ${esc(sig.emailAngle)}
+        </div>
+      </div>
+    `;
+    sigGrid.appendChild(card);
   });
+
+  // Subdomain table
+  const subdomains = Array.isArray(infra.subdomains_checked) ? infra.subdomains_checked : [];
+  document.getElementById('r-subdomain-count').textContent =
+    `${subdomains.length} subdomains · ${Array.isArray(infra.all_signals) ? infra.all_signals.length : 0} provider signals`;
+
+  const tbody = document.getElementById('r-subdomain-tbody');
+  tbody.innerHTML = '';
+  subdomains.forEach(s => {
+    const providerSet = [...new Set(s.ips.map(i => {
+      if (i.provider === 'GCP') return 'GCP';
+      if (i.provider === 'AWS') return 'AWS';
+      if (i.org && i.org.includes('Salesforce')) return 'Salesforce';
+      return 'Unknown';
+    }))];
+    const provBadges = providerSet.map(p => {
+      const cls = p === 'GCP' ? 'p-gcp' : p === 'AWS' ? 'p-aws' : p === 'Salesforce' ? 'p-sf' : 'p-uk';
+      return `<span class="provider-badge ${cls}">${p}</span>`;
+    }).join(' ');
+    const ips = s.ips.map(i => `<span class="ip-chip">${esc(i.ip)}</span>`).join('');
+    const cnames = s.cnames && s.cnames.length
+      ? s.cnames.map(c => `<span class="cname-chip">${esc(c)}</span>`).join('<br>')
+      : '<span style="color:var(--border2)">—</span>';
+    const sources = [...new Set(s.ips.map(i => i.source))].join(', ');
+    tbody.innerHTML += `<tr>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#cbd5e1">${esc(s.subdomain)}</td>
+      <td><div class="ip-list">${ips}</div></td>
+      <td>${provBadges}</td>
+      <td style="font-size:11px">${cnames}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)">${esc(sources)}</td>
+    </tr>`;
+  });
+
+  // Email infra
+  const email = infra.email_infrastructure || {};
+  document.getElementById('r-mx').innerHTML = (email.mx_records || [])
+    .map(mx => `<div class="mx-item">${esc(mx)}</div>`).join('') || '<span style="color:var(--muted)">—</span>';
+
+  document.getElementById('r-spf').innerHTML = esc(email.spf_record || '—')
+    .replace(/(include:[^\s]+)/g, '<span class="spf-include">$1</span>')
+    .replace(/(ip4:[^\s]+)/g,     '<span class="spf-ip">$1</span>')
+    .replace(/(-all)/g,           '<span class="spf-all">$1</span>');
+
+  // Tech stack
+  const hints = infra.tech_stack_hints || {};
+  const hTable = document.getElementById('r-headers-table');
+  const rows = Object.entries(hints).map(([k,v]) =>
+    `<tr>
+      <td style="padding:5px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">${esc(k)}</td>
+      <td style="padding:5px 0 5px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);border-bottom:1px solid var(--border);word-break:break-all">${esc(v)}</td>
+    </tr>`
+  ).join('');
+  hTable.innerHTML = rows || '<tr><td style="color:var(--muted)">—</td></tr>';
+
+  document.getElementById('r-coverage').innerHTML =
+    `IP coverage: <strong style="color:#e2e8f0">${esc(infra.ip_coverage||'—')}</strong>. CDN fronting flagged <strong style="color:var(--yellow)">${infra.cdn_fronted ? 'true' : 'false'}</strong> at infrastructure level${!infra.cdn_fronted ? ' despite Cloudflare headers present on primary domain — indicates partial/inconsistent WAF deployment' : ''}.`;
+
+  // Raw JSON
+  document.getElementById('json-infra-badge').textContent =
+    `infra.json · score ${infra.score} · ${Array.isArray(infra.all_signals) ? infra.all_signals.length : 0} signals`;
+  document.getElementById('json-ai-badge').textContent =
+    `ai.json · ${ai.tokensUsed || 0} tokens · cost ${ai.totalCostToAIProvider || '—'}`;
+  document.getElementById('json-infra-content').innerHTML = highlight(infra);
+  document.getElementById('json-ai-content').innerHTML   = highlight(ai);
+
+  // Footer
+  document.getElementById('footer-left').textContent = `Cloud Infra Mapping · ${infra.domain || id}`;
+  document.getElementById('footer-right').textContent = `Checked ${checkedAt} · Confidence: ${(infra.confidence||'').toUpperCase()}`;
+
+  // Page title
+  document.title = `Cloud Infra Report — ${infra.domain || id}`;
 }
+
+// ── Show/hide states ──────────────────────────────────────────────────────
+
+function showEmpty() {
+  document.getElementById('empty-state').style.display  = 'flex';
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('report').style.display        = 'none';
+}
+
+function showLoading() {
+  document.getElementById('empty-state').style.display  = 'none';
+  document.getElementById('loading-state').style.display = 'flex';
+  document.getElementById('report').style.display        = 'none';
+}
+
+function showReport() {
+  document.getElementById('empty-state').style.display  = 'none';
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('report').style.display        = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+init();
+</script>
+</body>
+</html>
