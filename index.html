@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud Infra Reports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #111418;
+    --bg3: #181c22;
+    --border: #1f2530;
+    --border2: #2a3040;
+    --text: #d4dae6;
+    --muted: #6b7585;
+    --accent: #3b82f6;
+    --accent2: #22d3ee;
+    --green: #10b981;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --aws: #ff9900;
+    --gcp: #4285f4;
+    --sf: #00a1e0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--accent2); }
+
+  /* ── COMPANY SELECTOR ── */
+  .selector-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .selector-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  #company-select {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 7px 32px 7px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7585' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    min-width: 220px;
+    transition: border-color 0.15s;
+  }
+
+  #company-select:hover { border-color: var(--accent); }
+  #company-select:focus { outline: none; border-color: var(--accent); }
+  #company-select option { background: var(--bg3); }
+
+  .report-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* ── LOADING / EMPTY STATE ── */
+  #loading-state, #empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 16px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 40px 40px 28px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+  }
+
+  .domain-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+  }
+
+  .domain-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 14px;
+  }
+
+  .headline {
+    font-size: 15px;
+    color: var(--text);
+    max-width: 760px;
+    line-height: 1.7;
+    margin-bottom: 28px;
+    opacity: 0.85;
+  }
+
+  /* ── STAT CARDS ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+    gap: 10px;
+  }
+
+  .stat-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+
+  .stat-card .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 5px;
+  }
+
+  .stat-card .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 19px;
+    font-weight: 600;
+  }
+
+  .stat-card .sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .v-gcp    { color: var(--gcp); }
+  .v-aws    { color: var(--aws); }
+  .v-green  { color: var(--green); }
+  .v-yellow { color: var(--yellow); }
+  .v-purple { color: var(--purple); }
+  .v-cyan   { color: var(--accent2); }
+  .v-sf     { color: var(--sf); }
+
+  /* ── CONTENT ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 40px 80px; }
+
+  .section { margin-top: 36px; }
+
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── SIGNALS ── */
+  .signal-grid { display: grid; gap: 8px; }
+
+  .signal-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .signal-card:hover { border-color: var(--border2); }
+
+  .signal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .signal-type {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .type-multi_cloud      { background: rgba(59,130,246,0.15);  color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
+  .type-security_tooling { background: rgba(16,185,129,0.15);  color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
+  .type-payment_infra    { background: rgba(0,161,224,0.15);   color: var(--sf);     border: 1px solid rgba(0,161,224,0.3); }
+  .type-geography        { background: rgba(245,158,11,0.15);  color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+  .type-devops_maturity  { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+
+  .signal-label { font-weight: 500; font-size: 14px; color: #e2e8f0; flex: 1; }
+
+  .chevron { color: var(--muted); font-size: 11px; transition: transform 0.2s; flex-shrink: 0; }
+  .open > .signal-header .chevron,
+  .open > .col-header .chevron,
+  .json-block.open > .json-header .chevron { transform: rotate(90deg); }
+
+  .signal-body {
+    display: none;
+    padding: 0 16px 14px;
+    border-top: 1px solid var(--border);
+  }
+  .signal-card.open .signal-body { display: block; }
+
+  .signal-detail {
+    font-size: 13px;
+    color: var(--text);
+    opacity: 0.8;
+    margin-top: 12px;
+    line-height: 1.7;
+  }
+
+  .signal-email-angle {
+    margin-top: 10px;
+    padding: 11px 13px;
+    background: rgba(59,130,246,0.06);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+    color: #94a3c0;
+    line-height: 1.7;
+  }
+
+  .signal-email-angle strong {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  /* ── COLLAPSIBLE SECTIONS ── */
+  .collapsible-section .col-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .collapsible-section.open .col-header { border-radius: 6px 6px 0 0; border-bottom: none; }
+  .collapsible-section .col-header:hover { background: var(--bg2); }
+
+  .col-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .col-count {
+    font-size: 10px;
+    padding: 2px 7px;
+    background: rgba(107,117,133,0.2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--muted);
+  }
+
+  .collapsible-section .col-body {
+    display: none;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    overflow: hidden;
+  }
+  .collapsible-section.open .col-body { display: block; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+  th {
+    text-align: left;
+    padding: 9px 13px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text);
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .provider-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 10px;
+    white-space: nowrap;
+    margin: 1px;
+  }
+
+  .p-gcp { background: rgba(66,133,244,0.2);  color: #7ab4f5; border: 1px solid rgba(66,133,244,0.3); }
+  .p-aws { background: rgba(255,153,0,0.2);   color: #ffc04d; border: 1px solid rgba(255,153,0,0.3); }
+  .p-sf  { background: rgba(0,161,224,0.2);   color: #60c8ef; border: 1px solid rgba(0,161,224,0.3); }
+  .p-uk  { background: rgba(107,117,133,0.1); color: var(--muted); border: 1px solid var(--border); }
+
+  .ip-list { display: flex; flex-wrap: wrap; gap: 3px; }
+  .ip-chip {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 11px;
+    color: #8892a4;
+  }
+  .cname-chip {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(167,139,250,0.08);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 3px;
+    font-size: 10px;
+    color: #c4b5fd;
+    word-break: break-all;
+    margin: 1px 0;
+  }
+
+  /* ── EMAIL INFRA ── */
+  .infra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .infra-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+
+  .infra-card .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .mx-item {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--green);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .mx-item:last-child { border-bottom: none; }
+
+  .spf-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.8;
+    word-break: break-all;
+  }
+  .spf-include { color: var(--accent2); }
+  .spf-ip      { color: var(--yellow); }
+  .spf-all     { color: var(--red); }
+
+  /* ── JSON BLOCKS ── */
+  .json-block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .json-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 16px;
+    cursor: pointer;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+  }
+
+  .json-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .json-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    background: rgba(107,117,133,0.2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--muted);
+  }
+
+  .json-body { display: none; padding: 16px; overflow-x: auto; }
+  .json-block.open .json-body { display: block; }
+
+  pre {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #8892a4;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  pre .k { color: #7dd3fc; }
+  pre .s { color: #86efac; }
+  pre .n { color: #fda4af; }
+  pre .b { color: #c084fc; }
+
+  code {
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9em;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 20px 40px;
+    border-top: 1px solid var(--border);
+    background: var(--bg2);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  @media (max-width: 700px) {
+    header { flex-direction: column; gap: 12px; align-items: flex-start; padding: 16px 20px; }
+    .hero, .container, footer { padding-left: 20px; padding-right: 20px; }
+    .infra-grid { grid-template-columns: 1fr; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .domain-name { font-size: 18px; }
+    .selector-wrap { flex-wrap: wrap; }
+    #company-select { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Cloud Infra <span>Mapping</span></div>
+  <div class="selector-wrap">
+    <span class="selector-label">Company</span>
+    <select id="company-select">
+      <option value="">— select —</option>
+    </select>
+  </div>
+  <div class="report-meta" id="header-meta">—</div>
+</header>
+
+<!-- EMPTY STATE -->
+<div id="empty-state">
+  <div style="font-size:28px;opacity:0.3">◈</div>
+  <span>Select a company to load its report</span>
+</div>
+
+<!-- LOADING STATE -->
+<div id="loading-state" style="display:none">
+  <div class="spinner"></div>
+  <span>Loading report…</span>
+</div>
+
+<!-- REPORT (hidden until loaded) -->
+<div id="report" style="display:none">
+
+  <div class="hero">
+    <div style="max-width:1100px;margin:0 auto">
+      <div class="domain-label">Target Domain</div>
+      <div class="domain-name" id="r-domain">—</div>
+      <p class="headline" id="r-headline">—</p>
+      <div class="stat-row" id="r-stats"></div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <div class="section">
+      <div class="section-title" id="r-signals-title">AI Analysis — Signals</div>
+      <div class="signal-grid" id="r-signals"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">DNS Subdomain Scan</div>
+      <div class="collapsible-section open" id="subdomain-section">
+        <div class="col-header" onclick="toggleSection('subdomain-section')">
+          <div class="col-title">
+            Subdomains Checked
+            <span class="col-count" id="r-subdomain-count">—</span>
+          </div>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="col-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Subdomain</th>
+                  <th>IP(s)</th>
+                  <th>Provider</th>
+                  <th>CNAME(s)</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="r-subdomain-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Email Infrastructure</div>
+      <div class="infra-grid">
+        <div class="infra-card">
+          <div class="label">MX Records</div>
+          <div id="r-mx"></div>
+        </div>
+        <div class="infra-card">
+          <div class="label">SPF Record</div>
+          <div class="spf-value" id="r-spf"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Tech Stack Hints (HTTP Headers)</div>
+      <div class="infra-grid">
+        <div class="infra-card">
+          <div class="label">Detected Headers</div>
+          <table style="width:100%" id="r-headers-table"></table>
+        </div>
+        <div class="infra-card">
+          <div class="label">Coverage Note</div>
+          <p id="r-coverage" style="font-size:13px;color:var(--text);opacity:0.8;line-height:1.7"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Raw Data Payloads</div>
+      <div style="display:grid;gap:8px">
+        <div class="json-block" id="json-infra">
+          <div class="json-header" onclick="this.parentElement.classList.toggle('open')">
+            <div class="json-title">
+              Cloud Infra Mapping
+              <span class="json-badge" id="json-infra-badge">infra.json</span>
+            </div>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="json-body"><pre id="json-infra-content"></pre></div>
+        </div>
+        <div class="json-block" id="json-ai">
+          <div class="json-header" onclick="this.parentElement.classList.toggle('open')">
+            <div class="json-title">
+              AI Analysis
+              <span class="json-badge" id="json-ai-badge">ai.json</span>
+            </div>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="json-body"><pre id="json-ai-content"></pre></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+
+  <footer>
+    <span id="footer-left">Cloud Infra Mapping</span>
+    <span id="footer-right">—</span>
+  </footer>
+
+</div><!-- /report -->
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function highlight(obj) {
+  return JSON.stringify(obj, null, 2)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      let c = 'n';
+      if (/^"/.test(m)) c = /:$/.test(m) ? 'k' : 's';
+      else if (/true|false/.test(m)) c = 'b';
+      return `<span class="${c}">${m}</span>`;
+    });
+}
+
+function providerBadge(provider, org) {
+  if (provider === 'GCP') return '<span class="provider-badge p-gcp">GCP</span>';
+  if (provider === 'AWS') return '<span class="provider-badge p-aws">AWS</span>';
+  if (org && org.includes('Salesforce')) return '<span class="provider-badge p-sf">Salesforce</span>';
+  return '<span class="provider-badge p-uk">Unknown</span>';
+}
+
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── Load companies.json and populate selector ─────────────────────────────
+
+async function init() {
+  try {
+    const res = await fetch('data/companies.json');
+    const companies = await res.json();
+    const sel = document.getElementById('company-select');
+    companies.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.domain ? ` — ${c.domain}` : '');
+      sel.appendChild(opt);
+    });
+
+    // Support ?company=slug in URL
+    const params = new URLSearchParams(location.search);
+    if (params.get('company')) {
+      sel.value = params.get('company');
+      loadCompany(params.get('company'));
+    }
+  } catch(e) {
+    console.error('Failed to load companies.json', e);
+  }
+}
+
+document.getElementById('company-select').addEventListener('change', e => {
+  const id = e.target.value;
+  if (!id) { showEmpty(); return; }
+  // Update URL without reload
+  history.replaceState(null, '', `?company=${id}`);
+  loadCompany(id);
+});
+
+// ── Load & render a company ───────────────────────────────────────────────
+
+async function loadCompany(id) {
+  showLoading();
+  try {
+    const [infraRes, aiRes] = await Promise.all([
+      fetch(`data/${id}/infra.json`),
+      fetch(`data/${id}/ai.json`)
+    ]);
+    if (!infraRes.ok || !aiRes.ok) throw new Error('File not found');
+    const infra = await infraRes.json();
+    const ai    = await aiRes.json();
+    renderReport(infra, ai, id);
+    showReport();
+  } catch(e) {
+    showEmpty();
+    console.error('Error loading company data:', e);
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+
+function renderReport(infra, ai, id) {
+
+  // Header meta
+  const checkedAt = infra.checked_at ? new Date(infra.checked_at).toLocaleString() : '—';
+  document.getElementById('header-meta').innerHTML =
+    `Checked: ${checkedAt}<br>Confidence: <span style="color:var(--green)">${(infra.confidence||'').toUpperCase()}</span>`;
+
+  // Hero
+  document.getElementById('r-domain').textContent = infra.domain || id;
+  document.getElementById('r-headline').textContent = ai.headline || ai.hostingSummary || '';
+
+  // Stat cards
+  const subCount = Array.isArray(infra.subdomains_checked) ? infra.subdomains_checked.length : '?';
+  const providers = new Set();
+  if (Array.isArray(infra.all_signals)) {
+    infra.all_signals.forEach(s => s.provider && s.provider !== 'Unknown' && providers.add(s.provider));
+  }
+
+  const verdictColor = {GCP:'v-gcp', AWS:'v-aws', Azure:'v-cyan'}[infra.verdict] || 'v-green';
+
+  document.getElementById('r-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Verdict</div>
+      <div class="value ${verdictColor}">${esc(infra.verdict||'?')}</div>
+      <div class="sub">Primary cloud</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Confidence Score</div>
+      <div class="value v-green">${esc(infra.score||'?')}</div>
+      <div class="sub">${esc(infra.reasoning||'')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Subdomains Checked</div>
+      <div class="value" style="color:#e2e8f0">${subCount}</div>
+      <div class="sub">${esc(infra.ip_coverage||'')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Cloud Providers</div>
+      <div class="value v-purple">${providers.size || '?'}</div>
+      <div class="sub">${[...providers].join(' · ')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">CDN Fronted</div>
+      <div class="value ${infra.cdn_fronted ? 'v-green' : 'v-yellow'}">${infra.cdn_fronted ? 'Yes' : 'Partial'}</div>
+      <div class="sub">${infra.cdn_provider || 'Cloudflare on primary'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Signals</div>
+      <div class="value v-cyan">${Array.isArray(infra.all_signals) ? infra.all_signals.length : '?'}</div>
+      <div class="sub">Total detection signals</div>
+    </div>
+  `;
+
+  // Signals
+  const sigCount = Array.isArray(ai.signals) ? ai.signals.length : 0;
+  document.getElementById('r-signals-title').textContent = `AI Analysis — ${sigCount} Intelligence Signal${sigCount !== 1 ? 's' : ''}`;
+
+  const sigGrid = document.getElementById('r-signals');
+  sigGrid.innerHTML = '';
+  (ai.signals || []).forEach(sig => {
+    const card = document.createElement('div');
+    card.className = 'signal-card';
+    card.innerHTML = `
+      <div class="signal-header" onclick="this.closest('.signal-card').classList.toggle('open')">
+        <span class="signal-type type-${esc(sig.type)}">${esc(sig.type.replace(/_/g,' '))}</span>
+        <span class="signal-label">${esc(sig.label)}</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="signal-body">
+        <p class="signal-detail">${esc(sig.detail)}</p>
+        <div class="signal-email-angle">
+          <strong>Outreach Angle</strong>
+          ${esc(sig.emailAngle)}
+        </div>
+      </div>
+    `;
+    sigGrid.appendChild(card);
+  });
+
+  // Subdomain table
+  const subdomains = Array.isArray(infra.subdomains_checked) ? infra.subdomains_checked : [];
+  document.getElementById('r-subdomain-count').textContent =
+    `${subdomains.length} subdomains · ${Array.isArray(infra.all_signals) ? infra.all_signals.length : 0} provider signals`;
+
+  const tbody = document.getElementById('r-subdomain-tbody');
+  tbody.innerHTML = '';
+  subdomains.forEach(s => {
+    const providerSet = [...new Set(s.ips.map(i => {
+      if (i.provider === 'GCP') return 'GCP';
+      if (i.provider === 'AWS') return 'AWS';
+      if (i.org && i.org.includes('Salesforce')) return 'Salesforce';
+      return 'Unknown';
+    }))];
+    const provBadges = providerSet.map(p => {
+      const cls = p === 'GCP' ? 'p-gcp' : p === 'AWS' ? 'p-aws' : p === 'Salesforce' ? 'p-sf' : 'p-uk';
+      return `<span class="provider-badge ${cls}">${p}</span>`;
+    }).join(' ');
+    const ips = s.ips.map(i => `<span class="ip-chip">${esc(i.ip)}</span>`).join('');
+    const cnames = s.cnames && s.cnames.length
+      ? s.cnames.map(c => `<span class="cname-chip">${esc(c)}</span>`).join('<br>')
+      : '<span style="color:var(--border2)">—</span>';
+    const sources = [...new Set(s.ips.map(i => i.source))].join(', ');
+    tbody.innerHTML += `<tr>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#cbd5e1">${esc(s.subdomain)}</td>
+      <td><div class="ip-list">${ips}</div></td>
+      <td>${provBadges}</td>
+      <td style="font-size:11px">${cnames}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)">${esc(sources)}</td>
+    </tr>`;
+  });
+
+  // Email infra
+  const email = infra.email_infrastructure || {};
+  document.getElementById('r-mx').innerHTML = (email.mx_records || [])
+    .map(mx => `<div class="mx-item">${esc(mx)}</div>`).join('') || '<span style="color:var(--muted)">—</span>';
+
+  document.getElementById('r-spf').innerHTML = esc(email.spf_record || '—')
+    .replace(/(include:[^\s]+)/g, '<span class="spf-include">$1</span>')
+    .replace(/(ip4:[^\s]+)/g,     '<span class="spf-ip">$1</span>')
+    .replace(/(-all)/g,           '<span class="spf-all">$1</span>');
+
+  // Tech stack
+  const hints = infra.tech_stack_hints || {};
+  const hTable = document.getElementById('r-headers-table');
+  const rows = Object.entries(hints).map(([k,v]) =>
+    `<tr>
+      <td style="padding:5px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">${esc(k)}</td>
+      <td style="padding:5px 0 5px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);border-bottom:1px solid var(--border);word-break:break-all">${esc(v)}</td>
+    </tr>`
+  ).join('');
+  hTable.innerHTML = rows || '<tr><td style="color:var(--muted)">—</td></tr>';
+
+  document.getElementById('r-coverage').innerHTML =
+    `IP coverage: <strong style="color:#e2e8f0">${esc(infra.ip_coverage||'—')}</strong>. CDN fronting flagged <strong style="color:var(--yellow)">${infra.cdn_fronted ? 'true' : 'false'}</strong> at infrastructure level${!infra.cdn_fronted ? ' despite Cloudflare headers present on primary domain — indicates partial/inconsistent WAF deployment' : ''}.`;
+
+  // Raw JSON
+  document.getElementById('json-infra-badge').textContent =
+    `infra.json · score ${infra.score} · ${Array.isArray(infra.all_signals) ? infra.all_signals.length : 0} signals`;
+  document.getElementById('json-ai-badge').textContent =
+    `ai.json · ${ai.tokensUsed || 0} tokens · cost ${ai.totalCostToAIProvider || '—'}`;
+  document.getElementById('json-infra-content').innerHTML = highlight(infra);
+  document.getElementById('json-ai-content').innerHTML   = highlight(ai);
+
+  // Footer
+  document.getElementById('footer-left').textContent = `Cloud Infra Mapping · ${infra.domain || id}`;
+  document.getElementById('footer-right').textContent = `Checked ${checkedAt} · Confidence: ${(infra.confidence||'').toUpperCase()}`;
+
+  // Page title
+  document.title = `Cloud Infra Report — ${infra.domain || id}`;
+}
+
+// ── Show/hide states ──────────────────────────────────────────────────────
+
+function showEmpty() {
+  document.getElementById('empty-state').style.display  = 'flex';
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('report').style.display        = 'none';
+}
+
+function showLoading() {
+  document.getElementById('empty-state').style.display  = 'none';
+  document.getElementById('loading-state').style.display = 'flex';
+  document.getElementById('report').style.display        = 'none';
+}
+
+function showReport() {
+  document.getElementById('empty-state').style.display  = 'none';
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('report').style.display        = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+init();
+</script>
+</body>
+</html>
