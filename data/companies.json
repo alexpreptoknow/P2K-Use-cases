@@ -1,5 +1,5 @@
 [
-  { "id": "k2partnering", "name": "K2 Partnering", "domain": "k2partnering.com" }
-  { "id": "investec", "name": "Investec", "domain": "investec.com" }
+  { "id": "k2partnering", "name": "K2 Partnering", "domain": "k2partnering.com" },
+  { "id": "investec", "name": "Investec", "domain": "investec.com" },
   { "id": "photon", "name": "Photon", "domain": "photon.com" }
 ]
