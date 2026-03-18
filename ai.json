@@ -1,0 +1,40 @@
+{
+  "signals": [
+    {
+      "type": "multi_cloud",
+      "label": "GCP + AWS Split Environment",
+      "detail": "Primary domain and 7 subdomains (including managedsolutions, talent, careers, k2university) all resolve to GCP IP 35.214.78.165, while image.mail.k2partnering.com CNAMEs to AWS CloudFront (d33rfzh3b1oeyz.cloudfront.net) with IPs in AS16509 Amazon.com range.",
+      "emailAngle": "With your core platform on GCP and email delivery routing through AWS CloudFront, your PCI DSS cardholder data environment scope likely spans two cloud providers — we help staffing firms like K2 Partnering map and evidence that boundary for QSA audits."
+    },
+    {
+      "type": "security_tooling",
+      "label": "Sophos Email Gateway Active",
+      "detail": "MX records point exclusively to mx-01-us-east-2.prod.hydra.sophos.com and mx-02-us-east-2.prod.hydra.sophos.com, confirming Sophos Hydra (Email Security) is deployed for inbound mail filtering.",
+      "emailAngle": "You're running Sophos Hydra for email security, which is a strong control, but PCI DSS v4.0 Requirement 5.4 demands documented anti-phishing coverage across all channels — we can help you evidence that Sophos deployment satisfies scope for your next assessment."
+    },
+    {
+      "type": "payment_infra",
+      "label": "Salesforce Marketing Cloud in SPF Scope",
+      "detail": "SPF record includes _spf.salesforce.com and the CNAME chain for image.mail.k2partnering.com passes through tll7thrwf02scstq98npv1082dh0.image-sap.sfmc-content.com, confirming Salesforce Marketing Cloud is used for transactional/marketing email.",
+      "emailAngle": "Salesforce Marketing Cloud is explicitly in your SPF scope and handling email delivery — if any of those campaigns touch payment confirmations or candidate financial data, that brings SFMC into your PCI DSS cardholder data environment, which is a common audit gap we can help you close."
+    },
+    {
+      "type": "geography",
+      "label": "EU Remote Subdomain Exposed",
+      "detail": "euremote.k2partnering.com resolves to 193.130.74.203 (unknown org, non-cloud IP), and k2remote.k2partnering.com resolves to 95.138.136.210 — both appear to be self-hosted or third-party remote access endpoints outside the primary GCP environment.",
+      "emailAngle": "euremote.k2partnering.com and k2remote.k2partnering.com are resolving to unidentified IPs outside your GCP estate — remote access endpoints are a direct PCI DSS Requirement 8.6 finding if they lack MFA documentation, and we can help you assess whether they fall inside your compliance boundary."
+    },
+    {
+      "type": "devops_maturity",
+      "label": "Cloudflare WAF on GCP Origin",
+      "detail": "Response headers show server: cloudflare with cf-ray: 9de592e8b0a54205-EWR, meaning Cloudflare is fronting the GCP origin (35.214.78.165), but cdn_fronted is flagged false — suggesting partial or inconsistent Cloudflare coverage across subdomains.",
+      "emailAngle": "Cloudflare is active on your primary domain but our scan shows inconsistent coverage across subdomains like k2university.k2partnering.com and managedsolutions.k2partnering.com — uneven WAF coverage is a PCI DSS Requirement 6.4 gap that auditors routinely flag, and we can help you document the full perimeter."
+    }
+  ],
+  "headline": "k2partnering.com runs a GCP-primary multi-cloud environment with AWS CloudFront for email delivery and Salesforce Marketing Cloud for campaigns, creating a distributed PCI DSS compliance scope across at least three providers.",
+  "tokensUsed": 7070,
+  "inputTokens": 5936,
+  "outputTokens": 1134,
+  "hostingSummary": "Core web infrastructure (35.214.78.165) is hosted on GCP, with AWS CloudFront (d33rfzh3b1oeyz.cloudfront.net) used for email image delivery via Salesforce Marketing Cloud, and Sophos Email Security (Hydra MX) handling inbound mail filtering.",
+  "totalCostToAIProvider": "$0.034820000000000004"
+}
