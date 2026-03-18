@@ -1,0 +1,40 @@
+{
+  "signals": [
+    {
+      "type": "api_gateway",
+      "label": "Apigee Gateway on AWS Backend",
+      "detail": "api.investec.com CNAMEs through investec-prod-production.apigee.net and reu1rtd100-0-routers.dn.apigee.net before resolving to AWS IP 34.250.63.54, meaning cardholder data flows through both GCP-managed Apigee and AWS infrastructure.",
+      "emailAngle": "We noticed api.investec.com routes through Apigee (investec-prod-production.apigee.net) before hitting your AWS backend — in PCI DSS assessments, this dual-hop architecture often creates ambiguity around where your CDE boundary sits and which provider falls in scope."
+    },
+    {
+      "type": "multi_cloud",
+      "label": "Cloudflare, AWS, and Apigee in Scope",
+      "detail": "Production traffic spans Cloudflare (CDN/WAF), Google Apigee (API gateway), and AWS (origin compute at 34.250.63.54), meaning PCI DSS scope must be demonstrated across three distinct provider environments for a single API transaction.",
+      "emailAngle": "Investec's production API path touches Cloudflare, Apigee, and AWS in a single request chain — we specialise in helping financial institutions map and evidence PCI DSS scope across exactly this kind of multi-provider architecture."
+    },
+    {
+      "type": "devops_maturity",
+      "label": "Exposed Staging and Dev Subdomains",
+      "detail": "Both staging.investec.com and dev.investec.com are publicly resolvable and Cloudflare-fronted (104.16.203.57 / 104.16.204.57), sharing the same IP range as production — a common PCI DSS audit finding when non-prod environments are not demonstrably isolated from the CDE.",
+      "emailAngle": "Your staging.investec.com and dev.investec.com subdomains are publicly reachable and resolve to the same Cloudflare IP range as production — QSAs routinely flag this as evidence that non-prod environment segregation needs formal documentation under PCI DSS Requirement 12.5.2."
+    },
+    {
+      "type": "security_tooling",
+      "label": "Mimecast Email Security (ZA Region)",
+      "detail": "MX records point exclusively to za-smtp-inbound-1.mimecast.co.za and za-smtp-inbound-2.mimecast.co.za, confirming South Africa-region Mimecast deployment, which indicates a ZA-domiciled security stack alongside a globally distributed cloud infrastructure.",
+      "emailAngle": "Investec's email is routed through South African Mimecast endpoints, suggesting your security operations are ZA-anchored — we can help align your cloud PCI DSS compliance posture to both SARB and PCI SSC requirements given this cross-jurisdictional infrastructure."
+    },
+    {
+      "type": "payment_infra",
+      "label": "secure.investec.com Hardened Separately",
+      "detail": "secure.investec.com resolves to a distinct Cloudflare IP pair (104.18.191.234 / 104.18.190.234) separate from other subdomains, suggesting deliberate network segmentation for what is likely a sensitive banking or payment-facing surface.",
+      "emailAngle": "secure.investec.com sits on a distinct Cloudflare IP range from your other properties — if this subdomain handles any payment or authentication flows, we can help you formally document it as a scoped CDE asset with the evidence trail a QSA will require."
+    }
+  ],
+  "headline": "Investec's api.investec.com resolves through Apigee (investec-prod-production.apigee.net) on AWS, creating a multi-layer API compliance surface that spans Cloudflare, GCP's Apigee, and AWS — a classic PCI DSS scope creep scenario for a regulated financial institution.",
+  "tokensUsed": 5435,
+  "inputTokens": 4346,
+  "outputTokens": 1089,
+  "hostingSummary": "Investec hosts its API backend on AWS (34.250.63.54 via api.investec.com) with front-end and non-prod environments fronted by Cloudflare, and API traffic routed through Google's Apigee gateway.",
+  "totalCostToAIProvider": "$0.029369999999999997"
+}
