@@ -1,0 +1,391 @@
+{
+  "score": 27,
+  "domain": "photon.com",
+  "verdict": "Azure",
+  "evidence": [
+    "CNAME ai.photon.com → ai-audit-tools-test-ui.azurewebsites.net",
+    "CNAME ai.photon.com → waws-prod-blu-583.sip.azurewebsites.windows.net",
+    "CNAME ai.photon.com → waws-prod-blu-583-4035.eastus.cloudapp.azure.com",
+    "IP 20.119.16.59 (Azure) via ai.photon.com",
+    "IP 52.140.100.157 (Azure) via photontrack.photon.com",
+    "IP 52.172.203.24 (Azure) via photonu.photon.com",
+    "IP 104.211.74.213 (Azure) via pulsesearch.photon.com",
+    "IP 52.172.134.238 (Azure) via wsf-training.photon.com",
+    "SPF 52.140.100.70 → Azure"
+  ],
+  "reasoning": "Score 27 — multiple independent signals confirm Azure. Front-end behind Incapsula",
+  "checked_at": "2026-03-18T16:15:40.722Z",
+  "confidence": "high",
+  "all_signals": [
+    {
+      "score": 3,
+      "signal": "IP 45.60.88.43 (Incapsula) via photon.com",
+      "source": "DNS A record",
+      "provider": "Incapsula"
+    },
+    {
+      "score": 3,
+      "signal": "IP 107.154.137.43 (Incapsula) via photon.com",
+      "source": "DNS A record",
+      "provider": "Incapsula"
+    },
+    {
+      "score": 3,
+      "signal": "CNAME ai.photon.com → ai-audit-tools-test-ui.azurewebsites.net",
+      "source": "CNAME",
+      "provider": "Azure"
+    },
+    {
+      "score": 3,
+      "signal": "CNAME ai.photon.com → waws-prod-blu-583.sip.azurewebsites.windows.net",
+      "source": "CNAME",
+      "provider": "Azure"
+    },
+    {
+      "score": 3,
+      "signal": "CNAME ai.photon.com → waws-prod-blu-583-4035.eastus.cloudapp.azure.com",
+      "source": "CNAME",
+      "provider": "Azure"
+    },
+    {
+      "score": 3,
+      "signal": "IP 20.119.16.59 (Azure) via ai.photon.com",
+      "source": "DNS A record",
+      "provider": "Azure"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.241.207.140 (GCP) via backend-backstage.photon.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.241.207.140 (GCP) via backstage.photon.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 35.241.207.140 (GCP) via argocd.photon.com",
+      "source": "DNS A record",
+      "provider": "GCP"
+    },
+    {
+      "score": 3,
+      "signal": "IP 54.147.176.102 (AWS) via photon-dev.photon.com",
+      "source": "DNS A record",
+      "provider": "AWS"
+    },
+    {
+      "score": 3,
+      "signal": "IP 52.140.100.157 (Azure) via photontrack.photon.com",
+      "source": "DNS A record",
+      "provider": "Azure"
+    },
+    {
+      "score": 3,
+      "signal": "IP 52.172.203.24 (Azure) via photonu.photon.com",
+      "source": "DNS A record",
+      "provider": "Azure"
+    },
+    {
+      "score": 3,
+      "signal": "IP 104.211.74.213 (Azure) via pulsesearch.photon.com",
+      "source": "DNS A record",
+      "provider": "Azure"
+    },
+    {
+      "score": 3,
+      "signal": "IP 52.172.134.238 (Azure) via wsf-training.photon.com",
+      "source": "DNS A record",
+      "provider": "Azure"
+    },
+    {
+      "score": 3,
+      "signal": "IP 107.154.137.43 (Incapsula) via www.photon.com",
+      "source": "DNS A record",
+      "provider": "Incapsula"
+    },
+    {
+      "score": 3,
+      "signal": "SPF 52.140.100.70 → Azure",
+      "source": "SPF",
+      "provider": "Azure"
+    }
+  ],
+  "cdn_fronted": true,
+  "ip_coverage": "9/14 IPs identified (9 local, 5 API)",
+  "cdn_provider": "Incapsula",
+  "tech_stack_hints": {
+    "cf-ray": "9de58979b021081a-IAD",
+    "server": "cloudflare",
+    "x-generator": "Drupal 8 (https://www.drupal.org)",
+    "x-drupal-cache": "HIT",
+    "x-frame-options": "SAMEORIGIN",
+    "third_party_services": {
+      "Zoho": [
+        "itsupport.photon.com"
+      ],
+      "HubSpot": [
+        "partners.photon.com",
+        "info.photon.com"
+      ]
+    },
+    "content-security-policy": "report-uri /report-csp-violation"
+  },
+  "subdomains_checked": [
+    {
+      "ips": [
+        {
+          "ip": "45.60.88.43",
+          "org": "Incapsula",
+          "source": "local",
+          "country": null,
+          "provider": "Incapsula"
+        },
+        {
+          "ip": "107.154.137.43",
+          "org": "Incapsula",
+          "source": "local",
+          "country": null,
+          "provider": "Incapsula"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "199.60.103.29",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        },
+        {
+          "ip": "199.60.103.227",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [
+        "520036.group36.sites.hubspot.net",
+        "group36.sites.hscoscdn30.net"
+      ],
+      "subdomain": "partners.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "199.60.103.29",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        },
+        {
+          "ip": "199.60.103.227",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [
+        "520036.group36.sites.hubspot.net",
+        "group36.sites.hscoscdn30.net"
+      ],
+      "subdomain": "info.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "20.119.16.59",
+          "org": "Azure",
+          "source": "local",
+          "country": null,
+          "provider": "Azure"
+        }
+      ],
+      "cnames": [
+        "ai-audit-tools-test-ui.azurewebsites.net",
+        "waws-prod-blu-583.sip.azurewebsites.windows.net",
+        "waws-prod-blu-583-4035.eastus.cloudapp.azure.com"
+      ],
+      "subdomain": "ai.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "136.143.189.127",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [
+        "e809521690486546e6ac7f64774ca1b9.assist.cs.zohohost.com",
+        "assist.cs.zohohost.com",
+        "zs-us4-elczhost.zohohost.com",
+        "ZS-US4-ELCZHOST.zohohost.com"
+      ],
+      "subdomain": "itsupport.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.241.207.140",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "backend-backstage.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.241.207.140",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "backstage.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "35.241.207.140",
+          "org": "GCP",
+          "source": "local",
+          "country": null,
+          "provider": "GCP"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "argocd.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "54.147.176.102",
+          "org": "AWS",
+          "source": "local",
+          "country": null,
+          "provider": "AWS"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "photon-dev.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "52.140.100.157",
+          "org": "Azure",
+          "source": "local",
+          "country": null,
+          "provider": "Azure"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "photontrack.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "52.172.203.24",
+          "org": "Azure",
+          "source": "local",
+          "country": null,
+          "provider": "Azure"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "photonu.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "104.211.74.213",
+          "org": "Azure",
+          "source": "local",
+          "country": null,
+          "provider": "Azure"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "pulsesearch.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "75.2.106.85",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        },
+        {
+          "ip": "99.83.241.219",
+          "org": "unknown",
+          "source": "api",
+          "country": null,
+          "provider": "Unknown"
+        }
+      ],
+      "cnames": [
+        "photon.customdomains.okta.com",
+        "ok6-custom-crtrs.okta.com",
+        "ok6-custom-crtrs.oktaedge.okta.com",
+        "aa4314b2f84572f89.awsglobalaccelerator.com"
+      ],
+      "subdomain": "sso.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "52.172.134.238",
+          "org": "Azure",
+          "source": "local",
+          "country": null,
+          "provider": "Azure"
+        }
+      ],
+      "cnames": [],
+      "subdomain": "wsf-training.photon.com"
+    },
+    {
+      "ips": [
+        {
+          "ip": "107.154.137.43",
+          "org": "Incapsula",
+          "source": "local",
+          "country": null,
+          "provider": "Incapsula"
+        }
+      ],
+      "cnames": [
+        "5wcwl2i.impervadns.net"
+      ],
+      "subdomain": "www.photon.com"
+    }
+  ],
+  "email_infrastructure": {
+    "mx_records": [
+      "photon-com.mail.protection.outlook.com."
+    ],
+    "spf_record": "v=spf1 include:spf.protection.outlook.com include:spf_c.oraclecloud.com include:_spf.salesforce.com ip4:52.140.100.70/32 include:520036.spf08.hubspotemail.net -all",
+    "email_provider": "Microsoft 365"
+  }
+}
